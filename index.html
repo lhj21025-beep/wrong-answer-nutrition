@@ -149,10 +149,10 @@ if(FIREBASE_ENABLED){
 
 /* ============================== STORE ============================== */
 const TODAY = new Date('2026-08-08');
-const SUBJECTS = ['영양판정','영양교육','급식경영','생애주기영양학','지역사회영양학','식품학','조리원리','생리학'];
+const SUBJECTS = ['고급영양학+생화학','식품학','조리원리','영양교육 및 상담','영양판정','식사요법','단체급식','생애주기 영양학','식품위생학'];
 const SUBJECT_COLORS = {
-  '영양판정':'#3E6B9E','영양교육':'#7A5FA8','급식경영':'#E8A33D','생애주기영양학':'#4FC3C0',
-  '지역사회영양학':'#6C9A5E','식품학':'#C97A52','조리원리':'#B4552F','생리학':'#5B6BA8',
+  '고급영양학+생화학':'#5B6BA8','식품학':'#C97A52','조리원리':'#B4552F','영양교육 및 상담':'#7A5FA8',
+  '영양판정':'#3E6B9E','식사요법':'#4FC3C0','단체급식':'#E8A33D','생애주기 영양학':'#6C9A5E','식품위생학':'#8A6D3B',
 };
 const MISTAKE_TYPES = ['단순실수','개념미숙지','용어혼동','지문오독'];
 const STICKY_COLORS = [
@@ -169,12 +169,12 @@ const DEMO_SEED_STORE = {
      wrongReason:'신체계측법과 생화학적 방법을 혼동함',
      correctConcept:'생화학적 판정은 혈액·소변·조직 등 체내 시료의 생화학적 지표(혈청 알부민 등)를 측정하는 방법으로, 신체계측·임상조사와 구분된다.',
      source:'2021 기출 15번', createdAt:'2026-07-20', nextReviewAt:'2026-08-08', masteryLevel:0, reviewCount:0, correctCount:1, wrongCount:2, favorite:true, collectionIds:[], images:[]},
-    {id:2, subject:'급식경영', unit:'HACCP', tags:['CCP'], mistakeType:'지문오독',
+    {id:2, subject:'단체급식', unit:'HACCP', tags:['CCP'], mistakeType:'지문오독',
      ocrText:'HACCP의 7원칙 중 중요관리점(CCP) 결정 단계의 목적은?', answer:'②',
      wrongReason:'CCP와 일반관리점을 혼동해서 지문을 읽음',
      correctConcept:'CCP는 위해요소를 예방·제거·감소시킬 수 있는 최종 관리 지점으로, 모든 위해요소가 아닌 필수 관리 지점만 선정한다.',
      source:'2020 기출 33번', createdAt:'2026-07-18', nextReviewAt:'2026-08-15', masteryLevel:1, reviewCount:1, correctCount:2, wrongCount:1, favorite:false, collectionIds:[], images:[]},
-    {id:3, subject:'생애주기영양학', unit:'임신부 영양', tags:['엽산'], mistakeType:'개념미숙지',
+    {id:3, subject:'생애주기 영양학', unit:'임신부 영양', tags:['엽산'], mistakeType:'개념미숙지',
      ocrText:'임신부에게 특히 중요한 영양소인 엽산의 역할은?', answer:'①',
      wrongReason:'엽산과 철분의 역할을 혼동',
      correctConcept:'엽산은 DNA 합성과 세포분열에 관여하며, 결핍 시 태아 신경관결손 위험이 증가한다.',
@@ -189,7 +189,7 @@ const DEMO_SEED_STORE = {
      wrongReason:'호화와 노화 개념을 반대로 이해',
      correctConcept:'전분 호화는 물과 열이 가해져 전분입자가 팽윤·붕괴되어 점성이 증가하는 현상이다.',
      source:'2022 기출 18번', createdAt:'2026-07-10', nextReviewAt:'2026-08-08', masteryLevel:0, reviewCount:1, correctCount:0, wrongCount:1, favorite:false, collectionIds:[], images:[]},
-    {id:6, subject:'생리학', unit:'소화효소', tags:['췌장효소'], mistakeType:'단순실수',
+    {id:6, subject:'고급영양학+생화학', unit:'소화효소', tags:['췌장효소'], mistakeType:'단순실수',
      ocrText:'췌장에서 분비되는 소화효소가 아닌 것은?', answer:'①',
      wrongReason:'펩신 분비 위치를 착각',
      correctConcept:'췌장은 아밀레이스, 라이페이스, 트립신 등을 분비하며, 펩신은 위에서 분비되는 효소이다.',
@@ -204,10 +204,14 @@ const DEMO_SEED_STORE = {
       {id:'n3', label:'임상조사(C)', detail:'', children:[]},
       {id:'n4', label:'식사섭취조사(D)', detail:'', children:[]},
     ]},
+    '단체급식': {id:'root', label:'단체급식', detail:'', children:[
+      {id:'m1', label:'원가관리', detail:'', children:[]},
+      {id:'m2', label:'HACCP', detail:'', children:[]},
+    ]},
   },
   chunks: [
     {id:1, text:'혈청 알부민 반감기 약 20일 — 만성 영양상태 반영', subject:'영양판정', color:0, x:30, y:30},
-    {id:2, text:'CCP = 위해요소 예방·제거 가능한 필수 관리지점', subject:'급식경영', color:1, x:250, y:60},
+    {id:2, text:'CCP = 위해요소 예방·제거 가능한 필수 관리지점', subject:'단체급식', color:1, x:250, y:60},
   ],
   collections: [
     {id:'c1', name:'이번 주 볼 것', noteIds:[1,3]},
@@ -230,7 +234,7 @@ function makeReactive(obj, onChange){
 }
 let persistTimer = null;
 function persistAll(){
-  if(!FIREBASE_ENABLED || !currentUser) return;
+  if(!FIREBASE_ENABLED || !currentUser || suppressPersist) return;
   clearTimeout(persistTimer);
   persistTimer = setTimeout(()=>{
     const ref = db.collection('users').doc(currentUser.uid).collection('data');
@@ -743,14 +747,41 @@ function renderNotesCapture(root){
       <input type="file" id="cFileInput" accept="image/*" style="display:none;">
       <input type="file" id="cCameraInput" accept="image/*" capture="environment" style="display:none;">
     </div>
-    <div id="cToolbar" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
-    <div id="cCanvasShell" style="background:var(--desk-2);border-radius:12px;min-height:220px;display:flex;align-items:center;justify-content:center;position:relative;margin-bottom:14px;">
-      <div id="cEmpty" style="color:rgba(var(--text-muted-rgb),0.4);font-size:12.5px;text-align:center;padding:30px;">이미지를 업로드/촬영/붙여넣기 하세요</div>
-      <div id="cStage" hidden style="position:relative;max-width:100%;">
-        <img id="cImg" style="display:block;max-width:100%;max-height:280px;border-radius:6px;">
-        <canvas id="cCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;touch-action:none;"></canvas>
+
+    <div id="cToolbar" style="display:none;flex-direction:column;gap:10px;margin-bottom:12px;background:var(--desk-2);border-radius:12px;padding:12px 14px;">
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.06em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:6px;">펜 종류</div>
+        <div id="toolPens" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      </div>
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.06em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:6px;">도형</div>
+        <div id="toolShapes" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      </div>
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.06em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:6px;">색상</div>
+        <div id="toolColors" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.06em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;white-space:nowrap;">굵기</span>
+        <input type="range" id="sizeSlider" min="1" max="28" value="4" style="flex:1;accent-color:var(--amber);">
+        <span id="sizeVal" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(var(--text-muted-rgb),0.6);width:22px;text-align:right;">4</span>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn ghost" id="btnUndo" style="flex:1;">↶ 실행취소</button>
+        <button class="btn ghost" id="btnRedo" style="flex:1;">↷ 다시실행</button>
+        <button class="btn ghost" id="btnClearCanvas" style="flex:1;color:var(--danger);">전체삭제</button>
       </div>
     </div>
+
+    <div id="cCanvasShell" style="background:var(--desk-2);border-radius:12px;min-height:220px;display:flex;align-items:center;justify-content:center;position:relative;margin-bottom:8px;overflow:auto;padding:14px;">
+      <div id="cEmpty" style="color:rgba(var(--text-muted-rgb),0.4);font-size:12.5px;text-align:center;padding:30px;">
+        문제 이미지를 업로드/촬영/붙여넣기 하세요<br>
+        <span style="font-size:11px;opacity:0.7;">이미지 옆에 여백이 자동으로 생겨서 정답을 바로 적을 수 있어요</span>
+      </div>
+      <div id="cStage" hidden style="position:relative;"></div>
+    </div>
+    <div style="font-size:10.5px;color:rgba(var(--text-muted-rgb),0.35);margin-bottom:12px;">💡 오른쪽 여백에 정답을 적어두면, 분석 시 자동으로 정답란에 인식해서 채워드려요</div>
+
     <button class="btn blue" id="cAnalyzeBtn" style="margin-bottom:12px;display:none;">이미지 분석하기(OCR)</button>
     <div id="cOcrResult" style="display:none;margin-bottom:12px;"></div>
     <div style="margin-bottom:14px;">
@@ -767,7 +798,7 @@ function renderNotesCapture(root){
       <div class="field">
         <label>정답</label>
         <input id="cAnswer" placeholder="예: ③, 또는 직접 입력">
-        <div id="cAnswerHint" style="display:none;font-size:10.5px;color:var(--amber-soft);margin-top:2px;">⚠ 필기에서 자동 인식된 값이에요 — 틀렸을 수 있으니 꼭 확인해주세요</div>
+        <div id="cAnswerHint" style="display:none;font-size:10.5px;color:var(--amber-soft);margin-top:2px;">⚠ 여백 필기에서 자동 인식된 값이에요 — 꼭 확인해주세요</div>
       </div>
       <div class="field"></div>
     </div>
@@ -780,13 +811,75 @@ function renderNotesCapture(root){
   root.appendChild(wrap);
 
   let capturedImages = []; // 이 노트에 첨부되는 모든 이미지(메인+추가) dataURL 배열
+  const MARGIN_RATIO = 0.4; // 이미지 너비 대비 여백 비율
   const state = { tool:'ballpoint', color:'#22262F', size:4, hasImage:false, hasAnnotation:false };
-  const canvas = wrap.querySelector('#cCanvas');
-  const ctx = canvas.getContext('2d');
-  const img = wrap.querySelector('#cImg');
+
+  const PEN_TYPES = [
+    {k:'ballpoint', label:'볼펜'},
+    {k:'fountain', label:'만년필'},
+    {k:'pencil', label:'연필'},
+    {k:'highlighter', label:'형광펜'},
+    {k:'eraser', label:'지우개'},
+  ];
+  const SHAPE_TYPES = [
+    {k:'rect', label:'네모'},
+    {k:'underline', label:'밑줄'},
+    {k:'star', label:'별표'},
+  ];
+  const COLORS = [
+    {name:'검정', v:'#22262F'}, {name:'남색', v:'#2A4A70'}, {name:'파랑', v:'#3E6B9E'},
+    {name:'초록', v:'#4F8A5B'}, {name:'주황', v:'#E8A33D'}, {name:'빨강', v:'#C24B3F'},
+    {name:'보라', v:'#7A5FA8'}, {name:'갈색', v:'#8A5A2E'},
+    {name:'형광노랑', v:'#F4E04D'}, {name:'형광초록', v:'#7ED957'}, {name:'형광분홍', v:'#F477B0'},
+  ];
+
+  const pensWrap = wrap.querySelector('#toolPens');
+  PEN_TYPES.forEach((t,i)=>{
+    const b = document.createElement('button');
+    b.className = 'chip' + (i===0?' active':'');
+    b.textContent = t.label;
+    b.addEventListener('click', ()=>{
+      state.tool = t.k;
+      pensWrap.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+      shapesWrap.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+      b.classList.add('active');
+    });
+    pensWrap.appendChild(b);
+  });
+  const shapesWrap = wrap.querySelector('#toolShapes');
+  SHAPE_TYPES.forEach(t=>{
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = t.label;
+    b.addEventListener('click', ()=>{
+      state.tool = t.k;
+      pensWrap.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+      shapesWrap.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+      b.classList.add('active');
+    });
+    shapesWrap.appendChild(b);
+  });
+  const colorsWrap = wrap.querySelector('#toolColors');
+  COLORS.forEach((c,i)=>{
+    const b = document.createElement('button');
+    b.title = c.name;
+    b.style.cssText = `width:26px;height:26px;border-radius:50%;background:${c.v};cursor:pointer;border:2px solid ${i===0?'var(--amber)':'rgba(var(--border-rgb),0.15)'};`;
+    b.addEventListener('click', ()=>{
+      state.color = c.v;
+      colorsWrap.querySelectorAll('button').forEach(x=> x.style.borderColor='rgba(var(--border-rgb),0.15)');
+      b.style.borderColor = 'var(--amber)';
+    });
+    colorsWrap.appendChild(b);
+  });
+
+  const sizeSlider = wrap.querySelector('#sizeSlider');
+  sizeSlider.addEventListener('input', ()=>{ state.size = parseInt(sizeSlider.value,10); wrap.querySelector('#sizeVal').textContent = state.size; });
+
+  const canvasShell = wrap.querySelector('#cCanvasShell');
   const stage = wrap.querySelector('#cStage');
   const empty = wrap.querySelector('#cEmpty');
   const toolbar = wrap.querySelector('#cToolbar');
+  let canvas = null, ctx = null, imgEl = null, imgNaturalW = 0, imgNaturalH = 0, marginW = 0;
 
   function renderExtraThumbs(){
     const row = wrap.querySelector('#extraImagesRow');
@@ -808,38 +901,49 @@ function renderNotesCapture(root){
     });
   });
 
-
-  const TOOLS = [
-    {k:'ballpoint', label:'볼펜'}, {k:'highlighter', label:'형광펜'}, {k:'eraser', label:'지우개'},
-    {k:'rect', label:'네모'}, {k:'underline', label:'밑줄'},
-  ];
-  TOOLS.forEach(t=>{
-    const b = document.createElement('button');
-    b.className = 'chip' + (t.k===state.tool?' active':'');
-    b.textContent = t.label;
-    b.addEventListener('click', ()=>{
-      state.tool = t.k;
-      toolbar.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
-      b.classList.add('active');
-    });
-    toolbar.appendChild(b);
-  });
-
+  // ---------- 이미지 로드: 이미지 + 옆 여백을 하나의 캔버스로 구성 ----------
   function loadImage(src){
-    img.onload = ()=>{
+    const probe = new Image();
+    probe.onload = ()=>{
       empty.hidden = true; stage.hidden = false;
-      const rect = img.getBoundingClientRect();
-      const dpr = window.devicePixelRatio||1;
-      canvas.width = rect.width*dpr; canvas.height = rect.height*dpr;
+      imgNaturalW = probe.naturalWidth; imgNaturalH = probe.naturalHeight;
+
+      const containerMax = Math.min(canvasShell.clientWidth - 28, 760) || 640;
+      let dispW = imgNaturalW, dispH = imgNaturalH;
+      if(dispW > containerMax){ const r = containerMax/dispW; dispW = containerMax; dispH = dispH*r; }
+      const maxH = 640;
+      if(dispH > maxH){ const r = maxH/dispH; dispH = maxH; dispW = dispW*r; }
+
+      marginW = Math.max(160, dispW * MARGIN_RATIO);
+      const totalW = dispW + marginW;
+
+      stage.innerHTML = `
+        <div style="display:flex;">
+          <img id="cImg" src="${src}" style="display:block;width:${dispW}px;height:${dispH}px;border-radius:6px 0 0 6px;">
+          <div style="width:${marginW}px;height:${dispH}px;background:var(--paper);border-radius:0 6px 6px 0;border:1.5px dashed rgba(var(--border-rgb),0.2);border-left:none;position:relative;">
+            <span style="position:absolute;top:6px;left:8px;font-size:9.5px;color:rgba(34,38,47,0.35);font-family:'JetBrains Mono',monospace;">✏️ 정답/메모 여백</span>
+          </div>
+        </div>
+        <canvas id="cCanvas" style="position:absolute;top:0;left:0;width:${totalW}px;height:${dispH}px;touch-action:none;"></canvas>
+      `;
+      imgEl = stage.querySelector('#cImg');
+      canvas = stage.querySelector('#cCanvas');
+      ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = totalW*dpr; canvas.height = dispH*dpr;
       ctx.setTransform(dpr,0,0,dpr,0,0);
+
       state.hasImage = true;
       toolbar.style.display = 'flex';
       wrap.querySelector('#cAnalyzeBtn').style.display = 'inline-block';
       capturedImages[0] = src;
       renderExtraThumbs();
+      attachCanvasEvents();
+      pushHistory();
     };
-    img.src = src;
+    probe.src = src;
   }
+
   wrap.querySelector('#cUpload').addEventListener('click', ()=> wrap.querySelector('#cFileInput').click());
   wrap.querySelector('#cCamera').addEventListener('click', ()=> wrap.querySelector('#cCameraInput').click());
   [wrap.querySelector('#cFileInput'), wrap.querySelector('#cCameraInput')].forEach(inp=>{
@@ -864,28 +968,131 @@ function renderNotesCapture(root){
     for(const it of items){ if(it.type.startsWith('image/')){ const f=it.getAsFile(); const r=new FileReader(); r.onload=ev=>loadImage(ev.target.result); r.readAsDataURL(f); e.preventDefault(); break; } }
   });
 
-  let drawing=false, lastX=0, lastY=0;
+  // ---------- 실행취소/다시실행 ----------
+  let history = [], redoStack = [];
+  function pushHistory(){
+    if(!canvas) return;
+    history.push(canvas.toDataURL());
+    if(history.length > 30) history.shift();
+    redoStack = [];
+  }
+  function restoreFrom(dataUrl, sync){
+    const dpr = window.devicePixelRatio || 1;
+    const img = new Image();
+    const draw = ()=>{
+      ctx.save(); ctx.setTransform(1,0,0,1,0,0);
+      ctx.clearRect(0,0,canvas.width, canvas.height);
+      ctx.restore();
+      ctx.drawImage(img,0,0,canvas.width/dpr,canvas.height/dpr);
+    };
+    img.onload = draw;
+    img.src = dataUrl;
+    if(sync && img.complete) draw();
+  }
+  wrap.querySelector('#btnUndo').addEventListener('click', ()=>{
+    if(!canvas || history.length <= 1) return;
+    redoStack.push(history.pop());
+    restoreFrom(history[history.length-1]);
+  });
+  wrap.querySelector('#btnRedo').addEventListener('click', ()=>{
+    if(!canvas || redoStack.length === 0) return;
+    const next = redoStack.pop();
+    history.push(next);
+    restoreFrom(next);
+  });
+  wrap.querySelector('#btnClearCanvas').addEventListener('click', ()=>{
+    if(!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.clearRect(0,0,canvas.width/dpr, canvas.height/dpr);
+    pushHistory();
+  });
+
+  // ---------- 드로잉 ----------
+  let drawing=false, lastX=0, lastY=0, shapeStartX=0, shapeStartY=0, shapeSnapshot=null;
   function pos(e){ const r = canvas.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
-  canvas.addEventListener('pointerdown', e=>{
-    if(!state.hasImage) return;
-    canvas.setPointerCapture(e.pointerId);
-    drawing = true; state.hasAnnotation = true; const p = pos(e); lastX=p.x; lastY=p.y;
-  });
-  canvas.addEventListener('pointermove', e=>{
-    if(!drawing) return;
-    const p = pos(e);
-    const pressure = e.pressure>0 ? e.pressure : 0.5;
-    if(state.tool==='eraser'){ ctx.globalCompositeOperation='destination-out'; }
-    else if(state.tool==='highlighter'){ ctx.globalCompositeOperation='multiply'; ctx.globalAlpha=0.35; }
-    else { ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1; }
-    ctx.strokeStyle = state.tool==='eraser' ? '#000' : state.color;
-    ctx.lineWidth = state.tool==='highlighter' ? state.size*2.2 : state.size*(0.6+pressure*0.6);
-    ctx.lineCap='round'; ctx.lineJoin='round';
-    ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(p.x,p.y); ctx.stroke();
+  function strokeStyleFor(tool){
+    if(tool==='highlighter') return {alpha:0.35, comp:'multiply'};
+    if(tool==='eraser') return {alpha:1, comp:'destination-out'};
+    return {alpha:1, comp:'source-over'};
+  }
+  function widthFor(tool, size, pressure){
+    if(tool==='pencil') return size*(0.4+pressure*1.2);
+    if(tool==='fountain') return size*(0.3+pressure*1.4);
+    if(tool==='ballpoint') return size*(0.6+pressure*0.5);
+    if(tool==='highlighter') return size*2.2;
+    if(tool==='eraser') return size*2;
+    return size;
+  }
+  function attachCanvasEvents(){
+    canvas.addEventListener('pointerdown', (e)=>{
+      canvas.setPointerCapture(e.pointerId);
+      const p = pos(e);
+      drawing = true;
+      if(['rect','underline','star'].includes(state.tool)){
+        shapeStartX=p.x; shapeStartY=p.y; shapeSnapshot = canvas.toDataURL();
+        if(state.tool==='star'){ drawStar(p.x,p.y,26); drawing=false; state.hasAnnotation=true; pushHistory(); }
+        return;
+      }
+      state.hasAnnotation = true;
+      lastX=p.x; lastY=p.y;
+      const pressure = e.pressure>0?e.pressure:0.5;
+      drawDot(p.x,p.y,pressure);
+    });
+    canvas.addEventListener('pointermove', (e)=>{
+      if(!drawing) return;
+      const p = pos(e);
+      const pressure = e.pressure>0?e.pressure:0.5;
+      if(state.tool==='rect' || state.tool==='underline'){
+        restoreFrom(shapeSnapshot, true);
+        if(state.tool==='rect') drawRectPreview(shapeStartX,shapeStartY,p.x,p.y);
+        else drawUnderlinePreview(shapeStartX,shapeStartY,p.x,p.y);
+        return;
+      }
+      drawLine(lastX,lastY,p.x,p.y,pressure);
+      lastX=p.x; lastY=p.y;
+    });
+    ['pointerup','pointerleave','pointercancel'].forEach(evt=>{
+      canvas.addEventListener(evt, ()=>{ if(!drawing) return; drawing=false; pushHistory(); });
+    });
+  }
+  function drawDot(x,y,pressure){
+    const {alpha,comp} = strokeStyleFor(state.tool);
+    ctx.globalCompositeOperation=comp; ctx.globalAlpha=alpha;
+    ctx.fillStyle = state.tool==='eraser' ? '#000' : state.color;
+    const w = widthFor(state.tool, state.size, pressure);
+    ctx.beginPath(); ctx.arc(x,y,w/2,0,Math.PI*2); ctx.fill();
     ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
-    lastX=p.x; lastY=p.y;
-  });
-  ['pointerup','pointerleave'].forEach(evt=> canvas.addEventListener(evt, ()=> drawing=false));
+  }
+  function drawLine(x1,y1,x2,y2,pressure){
+    const {alpha,comp} = strokeStyleFor(state.tool);
+    ctx.globalCompositeOperation=comp; ctx.globalAlpha=alpha;
+    ctx.strokeStyle = state.tool==='eraser' ? '#000' : state.color;
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.lineWidth = widthFor(state.tool, state.size, pressure);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+  }
+  function drawRectPreview(x1,y1,x2,y2){
+    ctx.globalCompositeOperation='source-over';
+    ctx.strokeStyle = state.color; ctx.lineWidth = Math.max(2, state.size*0.7);
+    ctx.strokeRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+  }
+  function drawUnderlinePreview(x1,y1,x2,y2){
+    ctx.globalCompositeOperation='source-over';
+    ctx.strokeStyle=state.color; ctx.lineWidth=Math.max(3,state.size*0.8); ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y1); ctx.stroke();
+  }
+  function drawStar(cx,cy,r){
+    ctx.globalCompositeOperation='source-over'; ctx.fillStyle=state.color;
+    ctx.beginPath();
+    for(let i=0;i<10;i++){
+      const rad = i%2===0?r:r*0.45;
+      const ang = (Math.PI/5)*i - Math.PI/2;
+      const px=cx+rad*Math.cos(ang), py=cy+rad*Math.sin(ang);
+      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.closePath(); ctx.fill();
+  }
 
   wrap.querySelector('#cAnalyzeBtn').addEventListener('click', function(){
     this.textContent = '분석 중...'; this.disabled = true;
@@ -901,9 +1108,8 @@ function renderNotesCapture(root){
 
       if(state.hasAnnotation){
         const detectedAnswer = '③';
-        resultHtml += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(62,107,158,0.25);font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--amber-soft);">✏️ 필기에서 정답 표시 감지: <b>${detectedAnswer}</b> (인식률 낮을 수 있음)</div>`;
-        const answerInput = wrap.querySelector('#cAnswer');
-        answerInput.value = detectedAnswer;
+        resultHtml += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(62,107,158,0.25);font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--amber-soft);">✏️ 여백 필기에서 정답 표시 감지: <b>${detectedAnswer}</b> (인식률 낮을 수 있음)</div>`;
+        wrap.querySelector('#cAnswer').value = detectedAnswer;
         wrap.querySelector('#cAnswerHint').style.display = 'block';
       }
       resultHtml += `</div>`;
@@ -932,7 +1138,6 @@ function renderNotesCapture(root){
   });
 }
 
-/* ---------- 퀴즈 모드 (자동 객관식 생성) ---------- */
 function renderQuizSetup(root){
   const wrap = document.createElement('div');
   wrap.className = 'pad';
@@ -1029,8 +1234,9 @@ let mmSelectedId = {};
 function renderMindmap(root){
   const wrap = document.createElement('div');
   wrap.innerHTML = `<div class="row" style="padding:14px 20px 6px;gap:6px;" id="mmTabs"></div>
+    <div style="padding:0 20px 6px;font-size:11px;color:rgba(var(--text-muted-rgb),0.4);">💡 중심 키워드 주변의 ＋ 버튼을 눌러 상하좌우로 가지를 뻗어보세요</div>
     <div style="display:flex;gap:12px;padding:8px 20px 24px;flex-wrap:wrap;">
-      <div id="mmCanvasShell" style="flex:2;min-width:280px;background:var(--desk-2);border-radius:14px;overflow:auto;max-height:420px;position:relative;">
+      <div id="mmCanvasShell" style="flex:2;min-width:280px;background:var(--desk-2);border-radius:14px;overflow:auto;max-height:460px;position:relative;">
         <div id="mmCanvas" style="position:relative;"></div>
       </div>
       <div id="mmPanel" style="flex:1;min-width:220px;background:var(--desk-2);border-radius:14px;padding:14px 16px;"></div>
@@ -1067,47 +1273,156 @@ function renderMindmap(root){
   function findNode(node,id){ if(node.id===id) return node; for(const c of node.children){ const f=findNode(c,id); if(f) return f; } return null; }
   function findParent(node,id,p=null){ if(node.id===id) return p; for(const c of node.children){ const f=findParent(c,id,node); if(f) return f; } return null; }
 
+  const W=150, H=36, HSTEP=W+70, VSTEP=H+22, DIRS=['right','left','down','up'];
+  const DIR_ARROW = {right:'→',left:'←',down:'↓',up:'↑'};
+
+  function addRootChild(root2, dir){
+    const id = 'n'+Date.now();
+    root2.children.push({id, label:'새 키워드', detail:'', children:[], _dir:dir});
+    mmSelectedId[currentSubject] = id;
+    draw();
+    setTimeout(()=>{ wrap.querySelector('#mmLabel')?.focus(); wrap.querySelector('#mmLabel')?.select(); }, 30);
+  }
+  function addChildTo(parentNode){
+    const id = 'n'+Date.now();
+    parentNode.children.push({id, label:'새 키워드', detail:'', children:[]});
+    mmSelectedId[currentSubject] = id;
+    draw();
+    setTimeout(()=>{ wrap.querySelector('#mmLabel')?.focus(); wrap.querySelector('#mmLabel')?.select(); }, 30);
+  }
+  function deleteNode(root2, id){
+    if(!confirm('이 키워드와 하위 항목을 삭제할까요?')) return;
+    const p = findParent(root2, id);
+    if(p) p.children = p.children.filter(c=>c.id!==id);
+    if(mmSelectedId[currentSubject]===id) mmSelectedId[currentSubject] = null;
+    draw();
+  }
+
   function draw(){
     const panel = wrap.querySelector('#mmPanel');
     const canvasWrap = wrap.querySelector('#mmCanvas');
     if(!currentSubject){ canvasWrap.innerHTML=''; panel.innerHTML='<div style="color:rgba(var(--text-muted-rgb),0.35);font-size:12.5px;">마인드맵을 추가해보세요</div>'; return; }
     const root2 = store.mindmaps[currentSubject];
-    let yc = 0;
-    const W=150,H=36,GX=70,GY=12;
-    (function layout(n,d){
-      n._x = d*(W+GX);
-      if(n.children.length===0){ n._y = yc*(H+GY); yc++; }
-      else { n.children.forEach(c=>layout(c,d+1)); n._y = (n.children[0]._y + n.children[n.children.length-1]._y)/2; }
-    })(root2,0);
 
-    const flat=[]; let maxX=0,maxY=0;
-    (function collect(n){ flat.push(n); maxX=Math.max(maxX,n._x); maxY=Math.max(maxY,n._y); n.children.forEach(collect); })(root2);
-    canvasWrap.style.width = (maxX+W+30)+'px';
-    canvasWrap.style.height = (maxY+H+30)+'px';
-    canvasWrap.innerHTML = `<svg width="${maxX+W+30}" height="${maxY+H+30}" style="position:absolute;top:0;left:0;pointer-events:none;"></svg>`;
+    // ---------- 방향(상하좌우) 배정 ----------
+    root2.children.forEach((c,i)=>{ if(!c._dir) c._dir = DIRS[i%4]; });
+    const counters = {right:0,left:0,down:0,up:0};
+    function layoutBranch(node, depth, dir){
+      node._dir = dir;
+      node._main = (dir==='right'||dir==='left') ? depth*HSTEP : depth*VSTEP;
+      if(node.children.length===0){
+        node._cross = counters[dir] * ((dir==='right'||dir==='left') ? VSTEP : HSTEP);
+        counters[dir]++;
+      } else {
+        node.children.forEach(c=>layoutBranch(c, depth+1, dir));
+        node._cross = (node.children[0]._cross + node.children[node.children.length-1]._cross)/2;
+      }
+    }
+    root2.children.forEach(c=> layoutBranch(c, 1, c._dir));
+
+    const flatAll = []; (function collect(n){ flatAll.push(n); n.children.forEach(collect); })(root2);
+    root2._x = 0; root2._y = 0;
+    flatAll.forEach(n=>{
+      if(n===root2) return;
+      if(n._dir==='right'){ n._x=n._main; n._y=n._cross; }
+      else if(n._dir==='left'){ n._x=-n._main-W; n._y=n._cross; }
+      else if(n._dir==='down'){ n._y=n._main; n._x=n._cross; }
+      else { n._y=-n._main-H; n._x=n._cross; }
+    });
+    DIRS.forEach(dir=>{
+      const group = flatAll.filter(n=>n._dir===dir);
+      if(group.length===0) return;
+      if(dir==='right'||dir==='left'){
+        const mid=(Math.min(...group.map(n=>n._y))+Math.max(...group.map(n=>n._y)))/2;
+        group.forEach(n=> n._y -= mid);
+      } else {
+        const mid=(Math.min(...group.map(n=>n._x))+Math.max(...group.map(n=>n._x)))/2;
+        group.forEach(n=> n._x -= mid);
+      }
+    });
+
+    let minX=-W/2,minY=-H/2,maxX=W/2,maxY=H/2;
+    flatAll.forEach(n=>{ minX=Math.min(minX,n._x); minY=Math.min(minY,n._y); maxX=Math.max(maxX,n._x+W); maxY=Math.max(maxY,n._y+H); });
+    const PAD=54;
+    const offX=-minX+PAD, offY=-minY+PAD;
+    root2._x += offX; root2._y += offY;
+    flatAll.forEach(n=>{ n._x+=offX; n._y+=offY; });
+    const totalW = maxX-minX+PAD*2, totalH = maxY-minY+PAD*2;
+
+    canvasWrap.style.width = totalW+'px';
+    canvasWrap.style.height = totalH+'px';
+    canvasWrap.innerHTML = `<svg width="${totalW}" height="${totalH}" style="position:absolute;top:0;left:0;pointer-events:none;"></svg>`;
     const svg = canvasWrap.querySelector('svg');
-    (function lines(n){ n.children.forEach(c=>{
-      const x1=n._x+W,y1=n._y+H/2+15,x2=c._x,y2=c._y+H/2+15,mid=(x1+x2)/2;
-      const p=document.createElementNS('http://www.w3.org/2000/svg','path');
-      p.setAttribute('d',`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`);
-      p.setAttribute('stroke','rgba(var(--text-muted-rgb),0.18)'); p.setAttribute('stroke-width','2'); p.setAttribute('fill','none');
-      svg.appendChild(p); lines(c);
-    }); })(root2);
 
-    flat.forEach(n=>{
+    function edge(n){
+      n.children.forEach(c=>{
+        const dir = c._dir;
+        let x1,y1,x2,y2;
+        if(dir==='right'){ x1=n._x+W; y1=n._y+H/2; x2=c._x; y2=c._y+H/2; }
+        else if(dir==='left'){ x1=n._x; y1=n._y+H/2; x2=c._x+W; y2=c._y+H/2; }
+        else if(dir==='down'){ x1=n._x+W/2; y1=n._y+H; x2=c._x+W/2; y2=c._y; }
+        else { x1=n._x+W/2; y1=n._y; x2=c._x+W/2; y2=c._y+H; }
+        const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+        let d;
+        if(dir==='right'||dir==='left'){ const mid=(x1+x2)/2; d=`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`; }
+        else { const mid=(y1+y2)/2; d=`M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2}`; }
+        p.setAttribute('d', d);
+        p.setAttribute('stroke','rgba(var(--text-muted-rgb),0.18)'); p.setAttribute('stroke-width','2'); p.setAttribute('fill','none');
+        svg.appendChild(p);
+        edge(c);
+      });
+    }
+    edge(root2);
+
+    flatAll.forEach(n=>{
       const el = document.createElement('div');
       const sel = mmSelectedId[currentSubject]===n.id;
       el.dataset.nodeId = n.id;
-      el.style.cssText = `position:absolute;left:${n._x+15}px;top:${n._y+15}px;max-width:${W}px;background:${n.id==='root'?'var(--amber)':'var(--card)'};color:${n.id==='root'?'#241705':'var(--paper)'};border:1.5px solid ${sel?'var(--amber)':'rgba(var(--border-rgb),0.12)'};border-radius:9px;padding:8px 10px;font-size:12px;font-weight:${n.id==='root'?'700':'500'};cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
+      el.style.cssText = `position:absolute;left:${n._x}px;top:${n._y}px;width:${W}px;height:${H}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:var(--card);color:var(--paper);border:1.5px solid ${sel?'var(--amber)':'rgba(var(--border-rgb),0.12)'};border-radius:9px;padding:0 10px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
       el.textContent = n.label;
       el.addEventListener('click', ()=>{ mmSelectedId[currentSubject]=n.id; draw(); });
       canvasWrap.appendChild(el);
+
+      // 바깥쪽 방향으로 이어지는 ＋ 버튼
+      const addBtn = document.createElement('button');
+      addBtn.textContent = '＋';
+      addBtn.title = '이 가지에 키워드 추가';
+      const btnStyle = 'position:absolute;width:20px;height:20px;border-radius:50%;border:none;background:var(--blue);color:#fff;font-size:12px;cursor:pointer;line-height:20px;padding:0;';
+      if(n._dir==='right') addBtn.style.cssText = btnStyle + `left:${n._x+W+6}px;top:${n._y+H/2-10}px;`;
+      else if(n._dir==='left') addBtn.style.cssText = btnStyle + `left:${n._x-26}px;top:${n._y+H/2-10}px;`;
+      else if(n._dir==='down') addBtn.style.cssText = btnStyle + `left:${n._x+W/2-10}px;top:${n._y+H+6}px;`;
+      else addBtn.style.cssText = btnStyle + `left:${n._x+W/2-10}px;top:${n._y-26}px;`;
+      addBtn.addEventListener('click', (e)=>{ e.stopPropagation(); addChildTo(n); });
+      canvasWrap.appendChild(addBtn);
+
+      if(n.id !== 'root'){
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '×';
+        delBtn.title = '삭제';
+        delBtn.style.cssText = `position:absolute;left:${n._x+W-9}px;top:${n._y-9}px;width:18px;height:18px;border-radius:50%;border:none;background:var(--danger);color:#fff;font-size:11px;cursor:pointer;line-height:18px;padding:0;`;
+        delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); deleteNode(root2, n.id); });
+        canvasWrap.appendChild(delBtn);
+      }
+    });
+
+    // 루트 전용: 4방향 추가 버튼
+    DIRS.forEach(dir=>{
+      const b = document.createElement('button');
+      b.textContent = '＋ '+DIR_ARROW[dir];
+      b.title = dir+'쪽으로 새 가지';
+      const base = 'position:absolute;border-radius:999px;border:1px dashed rgba(var(--border-rgb),0.3);background:var(--desk-2);color:rgba(var(--text-muted-rgb),0.6);font-size:10.5px;padding:3px 8px;cursor:pointer;';
+      if(dir==='right') b.style.cssText = base + `left:${root2._x+W+30}px;top:${root2._y+H/2-11}px;`;
+      else if(dir==='left') b.style.cssText = base + `left:${root2._x-70}px;top:${root2._y+H/2-11}px;`;
+      else if(dir==='down') b.style.cssText = base + `left:${root2._x+W/2-24}px;top:${root2._y+H+30}px;`;
+      else b.style.cssText = base + `left:${root2._x+W/2-24}px;top:${root2._y-58}px;`;
+      b.addEventListener('click', ()=> addRootChild(root2, dir));
+      canvasWrap.appendChild(b);
     });
 
     const selId = mmSelectedId[currentSubject];
     const selNode = selId ? findNode(root2, selId) : null;
     if(!selNode){
-      panel.innerHTML = `<div style="color:rgba(var(--text-muted-rgb),0.35);font-size:12px;line-height:1.6;">노드를 탭하면 상세 개념을 정리할 수 있어요.</div>`;
+      panel.innerHTML = `<div style="color:rgba(var(--text-muted-rgb),0.35);font-size:12px;line-height:1.6;">노드를 탭하면 상세 개념을 정리할 수 있어요.<br><br>캔버스 위 <b style="color:var(--blue-soft)">＋</b> 버튼으로 원하는 방향에 바로 키워드를 추가할 수 있어요.</div>`;
       return;
     }
     panel.innerHTML = `
@@ -1125,20 +1440,9 @@ function renderMindmap(root){
     });
     panel.querySelector('#mmLabel').addEventListener('blur', ()=> draw());
     panel.querySelector('#mmDetail').addEventListener('input', e=>{ selNode.detail = e.target.value; });
-    panel.querySelector('#mmAdd').addEventListener('click', ()=>{
-      const id = 'n'+Date.now();
-      selNode.children.push({id,label:'새 키워드',detail:'',children:[]});
-      mmSelectedId[currentSubject] = id;
-      draw();
-    });
-    const delBtn = panel.querySelector('#mmDel');
-    if(delBtn) delBtn.addEventListener('click', ()=>{
-      if(!confirm('이 키워드와 하위 항목을 삭제할까요?')) return;
-      const p = findParent(root2, selNode.id);
-      if(p) p.children = p.children.filter(c=>c.id!==selNode.id);
-      mmSelectedId[currentSubject] = null;
-      draw();
-    });
+    panel.querySelector('#mmAdd').addEventListener('click', ()=> addChildTo(selNode));
+    const delBtn2 = panel.querySelector('#mmDel');
+    if(delBtn2) delBtn2.addEventListener('click', ()=> deleteNode(root2, selNode.id));
   }
   draw();
 }
@@ -1421,25 +1725,60 @@ function renderExport(root){
 /* ============================== INIT / AUTH ============================== */
 const loginGate = document.getElementById('loginGate');
 const appShell = document.querySelector('.topbar');
+let unsubscribeFns = [];
+let suppressPersist = false;
 
-async function loadStoreFromFirestore(uid){
+function isEditingNow(){
+  // 오답노트 작성 중이거나 모달이 열려있을 땐 원격 변경사항으로 인한 전체 재렌더를 잠시 미룸 (입력 중 포커스 보호)
+  if(currentTab==='notes' && notesSubview==='capture') return true;
+  if(document.querySelector('.modal-backdrop-guard')) return true;
+  const ae = document.activeElement;
+  if(ae && (ae.tagName==='TEXTAREA' || ae.tagName==='INPUT')) return true;
+  return false;
+}
+function maybeRender(){
+  if(isEditingNow()) return;
+  render();
+}
+
+function attachRealtimeListeners(uid){
   const ref = db.collection('users').doc(uid).collection('data');
-  const [metaSnap, notesSnap, mapsSnap, chunksSnap] = await Promise.all([
-    ref.doc('meta').get(), ref.doc('notes').get(), ref.doc('mindmaps').get(), ref.doc('chunks').get(),
-  ]);
-  const fresh = emptyStore();
-  if(metaSnap.exists){
-    const m = metaSnap.data();
-    fresh.examDate = m.examDate || fresh.examDate;
-    fresh.nextNoteId = m.nextNoteId || 1;
-    fresh.nextChunkId = m.nextChunkId || 1;
-    fresh.nextCollectionId = m.nextCollectionId || 1;
-    fresh.collections = m.collections || [];
-  }
-  if(notesSnap.exists) fresh.notes = notesSnap.data().items || [];
-  if(mapsSnap.exists) fresh.mindmaps = mapsSnap.data().items || {};
-  if(chunksSnap.exists) fresh.chunks = chunksSnap.data().items || [];
-  return fresh;
+  const un1 = ref.doc('meta').onSnapshot(snap=>{
+    suppressPersist = true;
+    if(snap.exists){
+      const m = snap.data();
+      store.examDate = m.examDate || store.examDate;
+      store.nextNoteId = m.nextNoteId || store.nextNoteId;
+      store.nextChunkId = m.nextChunkId || store.nextChunkId;
+      store.nextCollectionId = m.nextCollectionId || store.nextCollectionId;
+      store.collections = m.collections || [];
+    }
+    suppressPersist = false;
+    maybeRender();
+  });
+  const un2 = ref.doc('notes').onSnapshot(snap=>{
+    suppressPersist = true;
+    store.notes = snap.exists ? (snap.data().items || []) : [];
+    suppressPersist = false;
+    maybeRender();
+  });
+  const un3 = ref.doc('mindmaps').onSnapshot(snap=>{
+    suppressPersist = true;
+    store.mindmaps = snap.exists ? (snap.data().items || {}) : {};
+    suppressPersist = false;
+    maybeRender();
+  });
+  const un4 = ref.doc('chunks').onSnapshot(snap=>{
+    suppressPersist = true;
+    store.chunks = snap.exists ? (snap.data().items || []) : [];
+    suppressPersist = false;
+    maybeRender();
+  });
+  unsubscribeFns = [un1, un2, un3, un4];
+}
+function detachRealtimeListeners(){
+  unsubscribeFns.forEach(fn=> fn());
+  unsubscribeFns = [];
 }
 
 function showLoginGate(show){
@@ -1464,15 +1803,16 @@ if(FIREBASE_ENABLED){
     const pw = document.getElementById('loginPassword').value;
     auth.createUserWithEmailAndPassword(email, pw).catch(err=> loginError(err.message));
   });
-  auth.onAuthStateChanged(async (user)=>{
+  auth.onAuthStateChanged((user)=>{
     if(user){
       currentUser = user;
-      const loaded = await loadStoreFromFirestore(user.uid);
-      store = makeReactive(loaded, persistAll);
+      store = makeReactive(emptyStore(), persistAll);
       showLoginGate(false);
       switchTab('home');
+      attachRealtimeListeners(user.uid);
     } else {
       currentUser = null;
+      detachRealtimeListeners();
       showLoginGate(true);
     }
   });
