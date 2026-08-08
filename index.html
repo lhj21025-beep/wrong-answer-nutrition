@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>오답노트 통합 앱 프로토타입</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --desk:#1E212B; --desk-2:#262A36; --card:#2C3140; --paper:#F8F5EE;
+    --blue:#3E6B9E; --blue-soft:#B9CEE3; --amber:#E8A33D; --amber-soft:#F6DDAF;
+    --danger:#C97A52; --teal:#4FC3C0; --radius:14px;
+    --text-muted-rgb: 248,245,238;
+    --border-rgb: 255,255,255;
+  }
+  body.light{
+    --desk:#EDEAE1; --desk-2:#FFFFFF; --card:#FFFFFF; --paper:#22262F;
+    --blue:#3E6B9E; --blue-soft:#2A4A70; --amber:#B87A25; --amber-soft:#8A5A16;
+    --danger:#A15230; --teal:#1F8A86;
+    --text-muted-rgb: 34,38,47;
+    --border-rgb: 0,0,0;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;overscroll-behavior:none;}
+  body{
+    font-family:'Noto Sans KR',sans-serif;background:var(--desk);color:var(--paper);
+    display:flex;flex-direction:column;height:100vh;overflow:hidden;transition:background .15s,color .15s;
+  }
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:rgba(var(--border-rgb),0.12);border-radius:4px;}
+
+  .topbar{
+    display:flex;align-items:center;gap:12px;padding:14px 20px;flex-shrink:0;
+    border-bottom:1px solid rgba(var(--border-rgb),0.06);
+  }
+  .topbar .app-title{font-size:16px;font-weight:700;}
+  .topbar .tag{
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.08em;
+    color:var(--amber);background:rgba(232,163,61,0.12);
+    border:1px solid rgba(232,163,61,0.35);padding:2px 7px;border-radius:999px;
+  }
+  .topbar .sub{font-size:12px;color:rgba(var(--text-muted-rgb),0.4);margin-left:auto;}
+  @media (max-width:420px){ .topbar .sub{display:none;} }
+
+  #viewContainer{flex:1;overflow-y:auto;min-height:0;}
+
+  .bottom-nav{
+    display:flex;flex-shrink:0;border-top:1px solid rgba(var(--border-rgb),0.08);
+    background:var(--desk-2);padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+  }
+  .nav-btn{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+    padding:7px 2px;background:none;border:none;color:rgba(var(--text-muted-rgb),0.4);
+    cursor:pointer;border-radius:10px;
+  }
+  .nav-btn svg{width:20px;height:20px;}
+  .nav-btn span{font-size:10px;font-weight:500;}
+  .nav-btn.active{color:var(--amber);}
+
+  .pad{padding:16px 20px 28px;}
+  .row{display:flex;gap:14px;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:150px;}
+  .field label{
+    font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;
+    color:rgba(var(--text-muted-rgb),0.45);text-transform:uppercase;
+  }
+  .field select, .field textarea, .field input{
+    font-family:'Noto Sans KR',sans-serif;background:rgba(var(--border-rgb),0.05);
+    border:1px solid rgba(var(--border-rgb),0.1);border-radius:8px;color:var(--paper);
+    padding:9px 10px;font-size:13px;
+  }
+  .field textarea{min-height:56px;resize:vertical;line-height:1.5;}
+  .btn{
+    font-family:'Noto Sans KR',sans-serif;font-weight:700;border:none;border-radius:999px;
+    cursor:pointer;padding:9px 16px;font-size:12.5px;
+  }
+  .btn.primary{background:var(--amber);color:#241705;}
+  .btn.blue{background:var(--blue);color:#fff;}
+  .btn.ghost{background:var(--desk-2);color:var(--paper);border:1px solid rgba(var(--border-rgb),0.1);}
+  .btn.danger{background:var(--danger);color:#fff;}
+  .chip{
+    font-size:11.5px;padding:6px 12px;border-radius:999px;
+    border:1px solid rgba(var(--border-rgb),0.1);background:var(--desk-2);
+    color:rgba(var(--text-muted-rgb),0.6);cursor:pointer;
+  }
+  .chip.active{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700;}
+  .toast{
+    position:fixed;bottom:78px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--card);border:1px solid rgba(232,163,61,0.4);
+    color:var(--amber-soft);padding:11px 18px;border-radius:999px;
+    font-size:12.5px;font-weight:700;opacity:0;transition:all .25s ease;
+    pointer-events:none;z-index:200;max-width:88%;text-align:center;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="tag">INTEGRATED</span>
+  <span class="app-title" id="topTitle">홈</span>
+  <span class="sub" id="topSub">영양교사 임용시험 학습 앱</span>
+  <button id="themeToggle" style="background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;flex-shrink:0;margin-left:auto;">🌙</button>
+</div>
+
+<div id="viewContainer"></div>
+
+<nav class="bottom-nav" id="bottomNav"></nav>
+<div class="toast" id="toast"></div>
+
+<div id="loginGate" style="display:none;position:fixed;inset:0;background:var(--desk);z-index:500;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:340px;">
+    <div style="text-align:center;margin-bottom:22px;">
+      <div style="font-size:18px;font-weight:700;margin-bottom:6px;">오답노트 앱</div>
+      <div style="font-size:12.5px;color:rgba(var(--text-muted-rgb),0.5);">로그인하면 데이터가 클라우드에 저장되고<br>기기 간에도 동기화됩니다</div>
+    </div>
+    <div id="loginError" style="display:none;font-size:12px;color:var(--danger);background:rgba(201,122,82,0.12);border-radius:8px;padding:9px 11px;margin-bottom:10px;"></div>
+    <div class="field" style="margin-bottom:10px;"><label>이메일</label><input id="loginEmail" type="email" placeholder="you@example.com"></div>
+    <div class="field" style="margin-bottom:16px;"><label>비밀번호</label><input id="loginPassword" type="password" placeholder="6자 이상"></div>
+    <button class="btn primary" id="loginBtn" style="width:100%;padding:12px;margin-bottom:8px;">로그인</button>
+    <button class="btn ghost" id="signupBtn" style="width:100%;padding:12px;">처음이에요 — 계정 만들기</button>
+  </div>
+</div>
+
+<script>
+/* ============================== FIREBASE CONFIG ============================== */
+/* 아래 값을 Firebase 콘솔에서 복사한 firebaseConfig로 교체하세요.
+   apiKey가 기본값(YOUR_API_KEY) 그대로면 클라우드 저장 없이 이 브라우저에서만 동작하는 "데모 모드"로 실행됩니다. */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyD3Ok2um7PVdWzKGIN0GftaGsvamRxgusc",
+  authDomain: "wrong-answer-nutrition.firebaseapp.com",
+  projectId: "wrong-answer-nutrition",
+  storageBucket: "wrong-answer-nutrition.firebasestorage.app",
+  messagingSenderId: "510157450623",
+  appId: "1:510157450623:web:5e3eb6c930f986e10e3e4a"
+};
+const FIREBASE_ENABLED = FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
+let fbApp = null, db = null, auth = null, currentUser = null;
+if(FIREBASE_ENABLED){
+  fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.firestore();
+  auth = firebase.auth();
+}
+
+/* ============================== STORE ============================== */
+const TODAY = new Date('2026-08-08');
+const SUBJECTS = ['영양판정','영양교육','급식경영','생애주기영양학','지역사회영양학','식품학','조리원리','생리학'];
+const SUBJECT_COLORS = {
+  '영양판정':'#3E6B9E','영양교육':'#7A5FA8','급식경영':'#E8A33D','생애주기영양학':'#4FC3C0',
+  '지역사회영양학':'#6C9A5E','식품학':'#C97A52','조리원리':'#B4552F','생리학':'#5B6BA8',
+};
+const MISTAKE_TYPES = ['단순실수','개념미숙지','용어혼동','지문오독'];
+const STICKY_COLORS = [
+  {name:'주황', bg:'#F6DDAF', text:'#5A3B0C'}, {name:'파랑', bg:'#B9CEE3', text:'#1F3A56'},
+  {name:'청록', bg:'#BEEAE0', text:'#134A3D'}, {name:'코랄', bg:'#F5C7B0', text:'#6E3417'},
+  {name:'회색', bg:'#D8D6CE', text:'#3A3937'},
+];
+
+const DEMO_SEED_STORE = {
+  examDate: '2026-11-08',
+  notes: [
+    {id:1, subject:'영양판정', unit:'생화학적 판정', tags:['혈청알부민'], mistakeType:'개념미숙지',
+     ocrText:'다음 중 영양판정 방법 중 생화학적 방법에 해당하는 것은?', answer:'③',
+     wrongReason:'신체계측법과 생화학적 방법을 혼동함',
+     correctConcept:'생화학적 판정은 혈액·소변·조직 등 체내 시료의 생화학적 지표(혈청 알부민 등)를 측정하는 방법으로, 신체계측·임상조사와 구분된다.',
+     source:'2021 기출 15번', createdAt:'2026-07-20', nextReviewAt:'2026-08-08', masteryLevel:0, reviewCount:0, correctCount:1, wrongCount:2, favorite:true, collectionIds:[], images:[]},
+    {id:2, subject:'급식경영', unit:'HACCP', tags:['CCP'], mistakeType:'지문오독',
+     ocrText:'HACCP의 7원칙 중 중요관리점(CCP) 결정 단계의 목적은?', answer:'②',
+     wrongReason:'CCP와 일반관리점을 혼동해서 지문을 읽음',
+     correctConcept:'CCP는 위해요소를 예방·제거·감소시킬 수 있는 최종 관리 지점으로, 모든 위해요소가 아닌 필수 관리 지점만 선정한다.',
+     source:'2020 기출 33번', createdAt:'2026-07-18', nextReviewAt:'2026-08-15', masteryLevel:1, reviewCount:1, correctCount:2, wrongCount:1, favorite:false, collectionIds:[], images:[]},
+    {id:3, subject:'생애주기영양학', unit:'임신부 영양', tags:['엽산'], mistakeType:'개념미숙지',
+     ocrText:'임신부에게 특히 중요한 영양소인 엽산의 역할은?', answer:'①',
+     wrongReason:'엽산과 철분의 역할을 혼동',
+     correctConcept:'엽산은 DNA 합성과 세포분열에 관여하며, 결핍 시 태아 신경관결손 위험이 증가한다.',
+     source:'2023 기출 11번', createdAt:'2026-07-28', nextReviewAt:'2026-08-08', masteryLevel:0, reviewCount:0, correctCount:0, wrongCount:3, favorite:false, collectionIds:[], images:[]},
+    {id:4, subject:'식품학', unit:'단백질 변성', tags:['열변성'], mistakeType:'용어혼동',
+     ocrText:'단백질 변성의 원인으로 옳지 않은 것은?', answer:'④',
+     wrongReason:'1차구조 변화로 착각',
+     correctConcept:'단백질 변성은 열, pH변화, 중금속 등에 의해 3차 구조가 풀리는 현상으로 1차 구조는 변하지 않는다.',
+     source:'2024 기출 5번', createdAt:'2026-08-01', nextReviewAt:'2026-08-10', masteryLevel:1, reviewCount:2, correctCount:2, wrongCount:0, favorite:false, collectionIds:[], images:[]},
+    {id:5, subject:'조리원리', unit:'전분의 호화', tags:['호화'], mistakeType:'개념미숙지',
+     ocrText:'전분의 호화(gelatinization)에 영향을 미치는 요인은?', answer:'②',
+     wrongReason:'호화와 노화 개념을 반대로 이해',
+     correctConcept:'전분 호화는 물과 열이 가해져 전분입자가 팽윤·붕괴되어 점성이 증가하는 현상이다.',
+     source:'2022 기출 18번', createdAt:'2026-07-10', nextReviewAt:'2026-08-08', masteryLevel:0, reviewCount:1, correctCount:0, wrongCount:1, favorite:false, collectionIds:[], images:[]},
+    {id:6, subject:'생리학', unit:'소화효소', tags:['췌장효소'], mistakeType:'단순실수',
+     ocrText:'췌장에서 분비되는 소화효소가 아닌 것은?', answer:'①',
+     wrongReason:'펩신 분비 위치를 착각',
+     correctConcept:'췌장은 아밀레이스, 라이페이스, 트립신 등을 분비하며, 펩신은 위에서 분비되는 효소이다.',
+     source:'2021 기출 27번', createdAt:'2026-07-05', nextReviewAt:'2026-08-25', masteryLevel:2, reviewCount:3, correctCount:3, wrongCount:0, favorite:false, collectionIds:[], images:[]},
+  ],
+  mindmaps: {
+    '영양판정': {id:'root', label:'영양판정', detail:'', children:[
+      {id:'n1', label:'신체계측(A)', detail:'', children:[]},
+      {id:'n2', label:'생화학적(B)', detail:'', children:[
+        {id:'n2a', label:'혈청 알부민', detail:'반감기 약 20일, 만성 영양상태 반영', children:[]},
+      ]},
+      {id:'n3', label:'임상조사(C)', detail:'', children:[]},
+      {id:'n4', label:'식사섭취조사(D)', detail:'', children:[]},
+    ]},
+  },
+  chunks: [
+    {id:1, text:'혈청 알부민 반감기 약 20일 — 만성 영양상태 반영', subject:'영양판정', color:0, x:30, y:30},
+    {id:2, text:'CCP = 위해요소 예방·제거 가능한 필수 관리지점', subject:'급식경영', color:1, x:250, y:60},
+  ],
+  collections: [
+    {id:'c1', name:'이번 주 볼 것', noteIds:[1,3]},
+  ],
+  nextNoteId: 7, nextChunkId: 3, nextCollectionId: 2,
+};
+
+function emptyStore(){
+  return { examDate:'2026-11-08', notes:[], mindmaps:{}, chunks:[], collections:[], nextNoteId:1, nextChunkId:1, nextCollectionId:1 };
+}
+
+/* ---------- 반응형 store: 어디서든 값을 바꾸면 자동으로 Firestore에 저장(디바운스) ---------- */
+function makeReactive(obj, onChange){
+  if(typeof obj !== 'object' || obj === null) return obj;
+  for(const key in obj){ obj[key] = makeReactive(obj[key], onChange); }
+  return new Proxy(obj, {
+    set(target, prop, value){ target[prop] = makeReactive(value, onChange); onChange(); return true; },
+    deleteProperty(target, prop){ delete target[prop]; onChange(); return true; },
+  });
+}
+let persistTimer = null;
+function persistAll(){
+  if(!FIREBASE_ENABLED || !currentUser) return;
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(()=>{
+    const ref = db.collection('users').doc(currentUser.uid).collection('data');
+    ref.doc('meta').set({ examDate: store.examDate, nextNoteId: store.nextNoteId, nextChunkId: store.nextChunkId, nextCollectionId: store.nextCollectionId, collections: store.collections });
+    ref.doc('notes').set({ items: store.notes });
+    ref.doc('mindmaps').set({ items: store.mindmaps });
+    ref.doc('chunks').set({ items: store.chunks });
+  }, 600);
+}
+
+let store = FIREBASE_ENABLED ? makeReactive(emptyStore(), persistAll) : makeReactive(DEMO_SEED_STORE, persistAll);
+
+const REVIEW_INTERVALS = [1, 3, 7, 16]; // days, indexed by masteryLevel 0~3
+function addDays(dateStr, days){
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0,10);
+}
+function dDayToExam(){
+  const diff = Math.round((new Date(store.examDate) - TODAY) / 86400000);
+  return diff;
+}
+
+function isDue(d){ return new Date(d) <= TODAY; }
+function ddayStr(d){
+  const diff = Math.round((new Date(d)-TODAY)/86400000);
+  return diff<=0 ? '복습 D-DAY' : `D-${diff}`;
+}
+let toastTimer;
+function showToast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.classList.remove('show'), 2200);
+}
+
+/* ============================== NAV ============================== */
+const TABS = [
+  {key:'home', label:'홈', icon:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>'},
+  {key:'notes', label:'오답노트', icon:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'},
+  {key:'mindmap', label:'마인드맵', icon:'<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.3 11l7.4-3.6M8.3 13l7.4 3.6"/>'},
+  {key:'chunk', label:'청킹', icon:'<rect x="3" y="4" width="8" height="8" rx="1"/><rect x="13" y="4" width="8" height="6" rx="1"/><rect x="13" y="13" width="8" height="7" rx="1"/><rect x="3" y="14" width="8" height="6" rx="1"/>'},
+  {key:'stats', label:'통계', icon:'<path d="M4 20V10M12 20V4M20 20v-7"/>'},
+  {key:'export', label:'내보내기', icon:'<path d="M12 3v12M12 15l-4-4M12 15l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>'},
+];
+let currentTab = 'home';
+
+const navWrap = document.getElementById('bottomNav');
+TABS.forEach(t=>{
+  const b = document.createElement('button');
+  b.className = 'nav-btn' + (t.key===currentTab?' active':'');
+  b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${t.icon}</svg><span>${t.label}</span>`;
+  b.addEventListener('click', ()=> switchTab(t.key));
+  navWrap.appendChild(b);
+});
+function switchTab(key){
+  currentTab = key;
+  document.getElementById('topTitle').textContent = TABS.find(t=>t.key===key).label;
+  [...navWrap.children].forEach((b,i)=> b.classList.toggle('active', TABS[i].key===key));
+  render();
+}
+function render(){
+  const vc = document.getElementById('viewContainer');
+  vc.innerHTML = '';
+  vc.scrollTop = 0;
+  if(currentTab==='home') renderHome(vc);
+  else if(currentTab==='notes') renderNotes(vc);
+  else if(currentTab==='mindmap') renderMindmap(vc);
+  else if(currentTab==='chunk') renderChunk(vc);
+  else if(currentTab==='stats') renderStats(vc);
+  else if(currentTab==='export') renderExport(vc);
+}
+
+/* ---------- Theme toggle ---------- */
+document.getElementById('themeToggle').addEventListener('click', ()=>{
+  const isLight = document.body.classList.toggle('light');
+  document.getElementById('themeToggle').textContent = isLight ? '☀️' : '🌙';
+});
+
+
+
+/* ============================== HOME ============================== */
+function renderHome(root){
+  const totalNotes = store.notes.length;
+  const dueNotes = store.notes.filter(n=>isDue(n.nextReviewAt));
+  const totalDue = dueNotes.length;
+  const mapSubjects = Object.keys(store.mindmaps).filter(s=>store.mindmaps[s].children.length);
+  const totalChunks = store.chunks.length;
+  const totalFavorites = store.notes.filter(n=>n.favorite).length;
+  const dday = dDayToExam();
+
+  const wrap = document.createElement('div');
+  wrap.className = 'pad';
+  wrap.innerHTML = `
+    <div id="ddayBar" style="display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:14px;cursor:pointer;">
+      <span style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--amber-soft);">${dday>=0?`D-${dday}`:`D+${-dday}`}</span>
+      <span style="font-size:12px;color:rgba(var(--text-muted-rgb),0.5);">시험일 ${store.examDate} · 탭해서 변경</span>
+      <input type="date" id="examDateInput" value="${store.examDate}" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;">
+    </div>
+    ${totalDue>0 ? `<button class="btn primary" id="startReviewBtn" style="width:100%;margin-bottom:14px;padding:13px;font-size:14px;">오늘의 복습 시작하기 (${totalDue}건)</button>` : `<div style="background:var(--desk-2);border-radius:12px;padding:13px;text-align:center;font-size:12.5px;color:rgba(var(--text-muted-rgb),0.4);margin-bottom:14px;">오늘 복습할 오답노트가 없어요 🎉</div>`}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px;">
+      <div style="background:var(--desk-2);border-radius:var(--radius);padding:13px 15px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;">오답노트</div>
+        <div style="font-size:24px;font-weight:700;font-family:'Space Grotesk',sans-serif;">${totalNotes}<span style="font-size:12px;font-weight:500;color:rgba(var(--text-muted-rgb),0.4);"> 건</span></div>
+      </div>
+      <div style="background:var(--desk-2);border-radius:var(--radius);padding:13px 15px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;">오늘 복습</div>
+        <div style="font-size:24px;font-weight:700;font-family:'Space Grotesk',sans-serif;color:var(--danger);">${totalDue}<span style="font-size:12px;font-weight:500;color:rgba(var(--text-muted-rgb),0.4);"> 건</span></div>
+      </div>
+      <div style="background:var(--desk-2);border-radius:var(--radius);padding:13px 15px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;">즐겨찾기</div>
+        <div style="font-size:24px;font-weight:700;font-family:'Space Grotesk',sans-serif;color:var(--amber);">${totalFavorites}<span style="font-size:12px;font-weight:500;color:rgba(var(--text-muted-rgb),0.4);"> 건</span></div>
+      </div>
+      <div style="background:var(--desk-2);border-radius:var(--radius);padding:13px 15px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;">마인드맵</div>
+        <div style="font-size:24px;font-weight:700;font-family:'Space Grotesk',sans-serif;">${mapSubjects.length}<span style="font-size:12px;font-weight:500;color:rgba(var(--text-muted-rgb),0.4);"> 과목</span></div>
+      </div>
+      <div style="background:var(--desk-2);border-radius:var(--radius);padding:13px 15px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;">청킹</div>
+        <div style="font-size:24px;font-weight:700;font-family:'Space Grotesk',sans-serif;">${totalChunks}<span style="font-size:12px;font-weight:500;color:rgba(var(--text-muted-rgb),0.4);"> 개</span></div>
+      </div>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.05em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:8px;">과목별 현황</div>
+    <div id="subjectCards"></div>
+  `;
+  root.appendChild(wrap);
+
+  wrap.querySelector('#ddayBar').style.position = 'relative';
+  const dateInput = wrap.querySelector('#examDateInput');
+  wrap.querySelector('#ddayBar').addEventListener('click', ()=>{
+    dateInput.style.pointerEvents='auto'; dateInput.style.opacity='0';
+    dateInput.showPicker ? dateInput.showPicker() : dateInput.click();
+  });
+  dateInput.addEventListener('change', e=>{
+    store.examDate = e.target.value;
+    showToast('시험일이 변경되었습니다');
+    render();
+  });
+  const reviewBtn = wrap.querySelector('#startReviewBtn');
+  if(reviewBtn) reviewBtn.addEventListener('click', ()=> openReviewSession(dueNotes));
+
+  const cardsWrap = wrap.querySelector('#subjectCards');
+  SUBJECTS.forEach(subject=>{
+    const notes = store.notes.filter(n=>n.subject===subject);
+    const due = notes.filter(n=>isDue(n.nextReviewAt)).length;
+    const mmap = store.mindmaps[subject];
+    const chunks = store.chunks.filter(c=>c.subject===subject);
+    if(notes.length===0 && (!mmap||!mmap.children.length) && chunks.length===0) return;
+
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--card);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;border:1px solid rgba(var(--border-rgb),0.05);';
+    card.innerHTML = `
+      <div class="s-head" style="padding:12px 15px;display:flex;align-items:center;gap:9px;cursor:pointer;">
+        <span style="width:9px;height:9px;border-radius:50%;background:${SUBJECT_COLORS[subject]};flex-shrink:0;"></span>
+        <span style="font-size:13.5px;font-weight:700;flex:1;">${subject}</span>
+        <span class="chev" style="font-size:10px;color:rgba(var(--text-muted-rgb),0.35);transition:transform .15s;">▶</span>
+      </div>
+      <div class="s-stats" style="display:flex;gap:12px;padding:0 15px 12px;font-size:10.5px;font-family:'JetBrains Mono',monospace;color:rgba(var(--text-muted-rgb),0.5);flex-wrap:wrap;">
+        <span>오답 ${notes.length}건</span>
+        <span style="${due?'color:var(--danger);font-weight:700;':''}">${due?`복습 ${due}건`:'복습없음'}</span>
+        <span style="${mmap&&mmap.children.length?'':'opacity:0.4;'}">마인드맵 ${mmap&&mmap.children.length?'있음':'없음'}</span>
+        <span style="${chunks.length?'':'opacity:0.4;'}">청크 ${chunks.length}개</span>
+      </div>
+      <div class="s-detail" style="display:none;border-top:1px solid rgba(var(--border-rgb),0.06);padding:13px 15px 15px;background:rgba(0,0,0,0.12);"></div>
+    `;
+    const head = card.querySelector('.s-head');
+    const detail = card.querySelector('.s-detail');
+    head.addEventListener('click', ()=>{
+      const open = detail.style.display === 'block';
+      detail.style.display = open ? 'none' : 'block';
+      card.querySelector('.chev').style.transform = open ? '' : 'rotate(90deg)';
+      if(!open) fillDetail();
+    });
+    function fillDetail(){
+      let html = '';
+      html += `<div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:rgba(var(--text-muted-rgb),0.35);text-transform:uppercase;margin-bottom:7px;">정확한 개념</div>`;
+      if(notes.length){
+        notes.slice(0,2).forEach(n=>{
+          html += `<div style="font-size:12px;line-height:1.55;padding:8px 10px;background:rgba(var(--border-rgb),0.03);border-left:2px solid var(--amber);border-radius:0 6px 6px 0;margin-bottom:6px;">
+            <b>${n.unit}</b><br>${n.correctConcept}
+            <div style="margin-top:6px;">
+              <button class="link-btn" data-action="mindmap" data-note="${n.id}" style="font-size:10.5px;font-weight:700;color:var(--blue-soft);background:rgba(62,107,158,0.18);border:none;padding:3px 9px;border-radius:999px;cursor:pointer;">＋ 마인드맵에 추가</button>
+              <button class="link-btn" data-action="chunk" data-note="${n.id}" style="font-size:10.5px;font-weight:700;color:var(--blue-soft);background:rgba(62,107,158,0.18);border:none;padding:3px 9px;border-radius:999px;cursor:pointer;">＋ 청크로 요약</button>
+            </div>
+          </div>`;
+        });
+      } else html += `<div style="font-size:11.5px;color:rgba(var(--text-muted-rgb),0.35);">등록된 오답노트가 없어요</div>`;
+      html += `<div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:rgba(var(--text-muted-rgb),0.35);text-transform:uppercase;margin:12px 0 7px;">마인드맵</div>`;
+      if(mmap && mmap.children.length){
+        html += `<div style="display:flex;gap:6px;flex-wrap:wrap;">` + mmap.children.map(c=>`<span style="font-size:11px;padding:4px 10px;border-radius:999px;background:rgba(79,195,192,0.15);color:#9FE1DE;border:1px solid rgba(79,195,192,0.3);">${c.label}</span>`).join('') + `</div>`;
+      } else html += `<div style="font-size:11.5px;color:rgba(var(--text-muted-rgb),0.35);">아직 마인드맵이 없어요</div>`;
+      html += `<div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:rgba(var(--text-muted-rgb),0.35);text-transform:uppercase;margin:12px 0 7px;">청킹 카드</div>`;
+      if(chunks.length){
+        html += chunks.map(c=>`<span style="font-size:11px;padding:6px 10px;border-radius:6px;background:var(--amber-soft);color:#5A3B0C;font-weight:500;display:inline-block;margin:0 5px 5px 0;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.text}</span>`).join('');
+      } else html += `<div style="font-size:11.5px;color:rgba(var(--text-muted-rgb),0.35);">아직 청크가 없어요</div>`;
+
+      detail.innerHTML = html;
+      detail.querySelectorAll('.link-btn').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const note = store.notes.find(n=>n.id==btn.dataset.note);
+          if(btn.dataset.action === 'mindmap'){
+            if(!store.mindmaps[subject]) store.mindmaps[subject] = {id:'root', label:subject, detail:'', children:[]};
+            store.mindmaps[subject].children.push({id:'n'+Date.now(), label:note.unit, detail:note.correctConcept, children:[]});
+            showToast(`"${subject}" 마인드맵에 "${note.unit}" 노드가 추가되었습니다`);
+          } else {
+            store.chunks.push({id:store.nextChunkId++, text:note.correctConcept.slice(0,40)+(note.correctConcept.length>40?'…':''), subject, color:Math.floor(Math.random()*STICKY_COLORS.length), x:40+Math.random()*200, y:40+Math.random()*150});
+            showToast(`"${subject}" 청킹 보드에 요약 카드가 생성되었습니다`);
+          }
+        });
+      });
+    }
+    cardsWrap.appendChild(card);
+  });
+}
+
+/* ---------- 오늘의 복습 (플래시카드) ---------- */
+function openReviewSession(dueNotes){
+  if(dueNotes.length === 0) return;
+  let idx = 0, correctCount = 0, wrongCount = 0, revealed = false;
+  const queue = [...dueNotes];
+
+  const backdrop = document.createElement('div');
+  backdrop.style.cssText = 'position:fixed;inset:0;background:var(--desk);z-index:400;display:flex;flex-direction:column;';
+  document.body.appendChild(backdrop);
+
+  function draw(){
+    if(idx >= queue.length){
+      backdrop.innerHTML = `
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;">
+          <div style="font-size:34px;margin-bottom:10px;">🎉</div>
+          <div style="font-size:16px;font-weight:700;margin-bottom:6px;">오늘의 복습 완료!</div>
+          <div style="font-size:13px;color:rgba(var(--text-muted-rgb),0.5);margin-bottom:20px;">기억함 ${correctCount}건 · 다시 볼게요 ${wrongCount}건</div>
+          <button class="btn primary" id="reviewDone">홈으로</button>
+        </div>`;
+      backdrop.querySelector('#reviewDone').addEventListener('click', ()=>{ backdrop.remove(); render(); });
+      return;
+    }
+    const n = queue[idx];
+    revealed = false;
+    backdrop.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid rgba(var(--border-rgb),0.08);">
+        <button id="reviewClose" style="background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:28px;height:28px;border-radius:50%;cursor:pointer;">✕</button>
+        <div style="flex:1;text-align:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:rgba(var(--text-muted-rgb),0.5);">${idx+1} / ${queue.length}</div>
+        <div style="width:28px;"></div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:24px;overflow-y:auto;">
+        <div style="font-size:10.5px;font-weight:700;color:var(--amber-soft);text-align:center;margin-bottom:10px;">${n.subject} · ${n.unit}</div>
+        <div style="background:var(--card);border-radius:14px;padding:20px;font-size:14px;line-height:1.7;text-align:center;margin-bottom:16px;">${n.ocrText}</div>
+        <div id="revealArea"></div>
+      </div>
+      <div id="actionArea" style="padding:16px 20px calc(16px + env(safe-area-inset-bottom));border-top:1px solid rgba(var(--border-rgb),0.08);"></div>
+    `;
+    backdrop.querySelector('#reviewClose').addEventListener('click', ()=>{ backdrop.remove(); render(); });
+    const actionArea = backdrop.querySelector('#actionArea');
+    const revealArea = backdrop.querySelector('#revealArea');
+
+    function showAnswer(){
+      revealed = true;
+      revealArea.innerHTML = `
+        ${n.answer ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--blue-soft);">정답 ${n.answer}</div>` : ''}
+        <div style="font-size:12px;margin-bottom:8px;"><b style="color:rgba(var(--text-muted-rgb),0.5);">오답사유</b><br>${n.wrongReason}</div>
+        <div style="font-size:12.5px;background:rgba(232,163,61,0.12);border-radius:10px;padding:11px 13px;"><b style="color:var(--amber-soft);">정확한 개념</b><br>${n.correctConcept}</div>
+      `;
+      actionArea.innerHTML = `
+        <div style="display:flex;gap:8px;">
+          <button class="btn" id="wrongBtn" style="flex:1;background:var(--danger);color:#fff;padding:13px;">다시 볼게요</button>
+          <button class="btn" id="rightBtn" style="flex:1;background:var(--blue);color:#fff;padding:13px;">기억함</button>
+        </div>`;
+      actionArea.querySelector('#wrongBtn').addEventListener('click', ()=> answer(n, false));
+      actionArea.querySelector('#rightBtn').addEventListener('click', ()=> answer(n, true));
+    }
+    actionArea.innerHTML = `<button class="btn primary" id="revealBtn" style="width:100%;padding:13px;">정답 보기</button>`;
+    actionArea.querySelector('#revealBtn').addEventListener('click', showAnswer);
+  }
+
+  function answer(note, correct){
+    const realNote = store.notes.find(x=>x.id===note.id);
+    realNote.reviewCount = (realNote.reviewCount||0) + 1;
+    if(correct){
+      realNote.masteryLevel = Math.min(3, (realNote.masteryLevel||0)+1);
+      realNote.correctCount = (realNote.correctCount||0) + 1;
+      correctCount++;
+    } else {
+      realNote.masteryLevel = Math.max(0, (realNote.masteryLevel||0)-1);
+      realNote.wrongCount = (realNote.wrongCount||0) + 1;
+      wrongCount++;
+    }
+    realNote.lastReviewedAt = '2026-08-08';
+    realNote.nextReviewAt = addDays('2026-08-08', REVIEW_INTERVALS[realNote.masteryLevel]);
+    idx++;
+    draw();
+  }
+
+  draw();
+}
+
+/* ============================== NOTES (캔버스+OCR+목록) ============================== */
+let notesSubview = 'list'; // 'capture' | 'list' | 'quiz'
+function renderNotes(root){
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div style="display:flex;gap:6px;padding:14px 20px 4px;flex-wrap:wrap;">
+      <button class="btn ${notesSubview==='list'?'primary':'ghost'}" id="subList">목록</button>
+      <button class="btn ${notesSubview==='capture'?'primary':'ghost'}" id="subCapture">＋ 새 오답노트</button>
+      <button class="btn ${notesSubview==='quiz'?'primary':'ghost'}" id="subQuiz">퀴즈 모드</button>
+    </div>
+    <div id="notesSubContainer"></div>
+  `;
+  root.appendChild(wrap);
+  wrap.querySelector('#subList').addEventListener('click', ()=>{ notesSubview='list'; switchTab('notes'); });
+  wrap.querySelector('#subCapture').addEventListener('click', ()=>{ notesSubview='capture'; switchTab('notes'); });
+  wrap.querySelector('#subQuiz').addEventListener('click', ()=>{ notesSubview='quiz'; switchTab('notes'); });
+
+  const sub = wrap.querySelector('#notesSubContainer');
+  if(notesSubview==='list') renderNotesList(sub);
+  else if(notesSubview==='capture') renderNotesCapture(sub);
+  else renderQuizSetup(sub);
+}
+
+function renderNotesList(root){
+  const state = { search:'', subjects:new Set(), mistakes:new Set(), dueOnly:false, mode:'card' };
+  const wrap = document.createElement('div');
+  wrap.className = 'pad';
+  wrap.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <div style="flex:1;display:flex;align-items:center;gap:8px;background:var(--desk-2);border:1px solid rgba(var(--border-rgb),0.08);border-radius:999px;padding:9px 14px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(var(--text-muted-rgb),0.4)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="searchIn" placeholder="검색" style="flex:1;background:none;border:none;outline:none;color:var(--paper);font-size:13px;">
+      </div>
+      <button class="btn ghost" id="conceptModeBtn">개념만★</button>
+    </div>
+    <div class="row" style="margin-bottom:10px;" id="subjChips"></div>
+    <div id="resultArea"></div>
+  `;
+  root.appendChild(wrap);
+
+  const favChip = document.createElement('button');
+  favChip.className = 'chip'; favChip.textContent = '⭐ 즐겨찾기만';
+  favChip.addEventListener('click', ()=>{ state.favOnly = !state.favOnly; favChip.classList.toggle('active'); update(); });
+  wrap.querySelector('#subjChips').appendChild(favChip);
+
+  store.collections.forEach(c=>{
+    const chip = document.createElement('button');
+    chip.className = 'chip'; chip.textContent = '📁 '+c.name;
+    chip.addEventListener('click', ()=>{ state.collectionId = state.collectionId===c.id ? null : c.id; wrap.querySelectorAll('.coll-filter-chip').forEach(x=>x.classList.remove('active')); if(state.collectionId) chip.classList.add('active'); update(); });
+    chip.classList.add('coll-filter-chip');
+    wrap.querySelector('#subjChips').appendChild(chip);
+  });
+
+  SUBJECTS.forEach(s=>{
+    const chip = document.createElement('button');
+    chip.className = 'chip'; chip.textContent = s;
+    chip.addEventListener('click', ()=>{ state.subjects.has(s)?state.subjects.delete(s):state.subjects.add(s); chip.classList.toggle('active'); update(); });
+    wrap.querySelector('#subjChips').appendChild(chip);
+  });
+  wrap.querySelector('#searchIn').addEventListener('input', e=>{ state.search = e.target.value.toLowerCase(); update(); });
+  wrap.querySelector('#conceptModeBtn').addEventListener('click', (e)=>{
+    state.mode = state.mode==='card' ? 'concept' : 'card';
+    e.target.classList.toggle('primary'); e.target.classList.toggle('ghost');
+    update();
+  });
+
+  function filtered(){
+    return store.notes.filter(n=>{
+      if(state.favOnly && !n.favorite) return false;
+      if(state.collectionId && !(n.collectionIds||[]).includes(state.collectionId)) return false;
+      if(state.subjects.size && !state.subjects.has(n.subject)) return false;
+      if(state.search){
+        const hay = (n.ocrText+n.correctConcept+n.wrongReason+n.tags.join(' ')+n.unit).toLowerCase();
+        if(!hay.includes(state.search)) return false;
+      }
+      return true;
+    });
+  }
+  function update(){
+    const area = wrap.querySelector('#resultArea');
+    const list = filtered();
+    if(list.length===0){ area.innerHTML = '<div style="color:rgba(var(--text-muted-rgb),0.35);font-size:13px;padding:40px 0;text-align:center;">결과가 없어요</div>'; return; }
+    if(state.mode === 'concept'){
+      const grouped = {};
+      list.forEach(n=>(grouped[n.subject]||=[]).push(n));
+      area.innerHTML = Object.keys(grouped).map(s=>`
+        <div style="margin-bottom:16px;">
+          <h3 style="font-size:12.5px;color:var(--amber-soft);font-family:'JetBrains Mono',monospace;margin:0 0 8px;">${s} <span style="color:rgba(var(--text-muted-rgb),0.35);font-weight:400;">${grouped[s].length}개</span></h3>
+          ${grouped[s].map(n=>`<div style="background:var(--desk-2);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:9px 12px;margin-bottom:7px;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:rgba(var(--text-muted-rgb),0.35);margin-bottom:3px;">${n.unit} · ${n.source}</div>
+            <p style="margin:0;font-size:12.5px;line-height:1.6;">${n.correctConcept}</p>
+          </div>`).join('')}
+        </div>`).join('');
+      return;
+    }
+    area.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;">` +
+      list.map(n=>{
+        const due = isDue(n.nextReviewAt);
+        return `<div class="note-card" data-id="${n.id}" style="background:var(--card);border-radius:12px;overflow:hidden;cursor:pointer;border:1px solid rgba(var(--border-rgb),0.05);">
+          <div style="height:60px;background:${SUBJECT_COLORS[n.subject]};display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;position:relative;">
+            ${n.subject[0]}
+            <button class="fav-star" data-id="${n.id}" style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.35);border:none;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;color:${n.favorite?'var(--amber)':'rgba(var(--border-rgb),0.6)'};">${n.favorite?'★':'☆'}</button>
+            <span style="position:absolute;top:6px;right:6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;background:${due?'var(--danger)':'rgba(0,0,0,0.35)'};color:${due?'#fff':'var(--amber-soft)'};">${ddayStr(n.nextReviewAt)}</span>
+          </div>
+          <div style="padding:10px 11px;">
+            <div style="font-size:10px;font-weight:700;color:var(--amber-soft);margin-bottom:4px;">${n.subject} · ${n.mistakeType}</div>
+            <div style="font-size:11px;color:rgba(var(--text-muted-rgb),0.85);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${n.correctConcept}</div>
+          </div>
+        </div>`;
+      }).join('') + `</div>`;
+    area.querySelectorAll('.fav-star').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const note = store.notes.find(n=>n.id==btn.dataset.id);
+        note.favorite = !note.favorite;
+        update();
+      });
+    });
+    area.querySelectorAll('.note-card').forEach(el=>{
+      el.addEventListener('click', ()=> openNoteModal(store.notes.find(n=>n.id==el.dataset.id)));
+    });
+  }
+  update();
+}
+
+function openNoteModal(note){
+  const backdrop = document.createElement('div');
+  backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:300;';
+  backdrop.innerHTML = `
+    <div style="background:var(--card);border-radius:16px;max-width:420px;width:100%;max-height:82vh;overflow-y:auto;padding:20px 22px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+        <h3 style="margin:0;font-size:15px;">${note.unit}</h3>
+        <div style="display:flex;gap:6px;">
+          <button id="favToggle" style="background:rgba(var(--border-rgb),0.08);border:none;color:${note.favorite?'var(--amber)':'var(--paper)'};width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:13px;">${note.favorite?'★':'☆'}</button>
+          <button id="closeModal" style="background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:24px;height:24px;border-radius:50%;cursor:pointer;">✕</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:rgba(var(--text-muted-rgb),0.4);margin-bottom:12px;">${note.subject} · ${note.mistakeType} · ${note.source}</div>
+      ${note.images && note.images.length ? `<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;">${note.images.map(src=>`<img src="${src}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;">`).join('')}</div>` : ''}
+      <div style="font-size:12px;margin-bottom:10px;"><b style="color:rgba(var(--text-muted-rgb),0.5);">문제</b><br>${note.ocrText}</div>
+      ${note.answer ? `<div style="font-size:12px;margin-bottom:10px;"><b style="color:rgba(var(--text-muted-rgb),0.5);">정답</b> ${note.answer}</div>` : ''}
+      <div style="font-size:12px;margin-bottom:10px;"><b style="color:rgba(var(--text-muted-rgb),0.5);">오답사유</b><br>${note.wrongReason}</div>
+      <div style="font-size:12px;background:rgba(232,163,61,0.1);border-radius:8px;padding:9px 11px;margin-bottom:14px;"><b style="color:var(--amber-soft);">정확한 개념</b><br>${note.correctConcept}</div>
+      <div style="margin-bottom:14px;">
+        <label style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.06em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;display:block;margin-bottom:6px;">컬렉션</label>
+        <div id="collChipsWrap" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn blue" id="toMindmap">＋ 마인드맵에 추가</button>
+        <button class="btn blue" id="toChunk">＋ 청크로 요약</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const collWrap = backdrop.querySelector('#collChipsWrap');
+  function drawCollChips(){
+    collWrap.innerHTML = store.collections.map(c=>{
+      const inColl = note.collectionIds && note.collectionIds.includes(c.id);
+      return `<button class="chip coll-chip ${inColl?'active':''}" data-cid="${c.id}">${c.name}</button>`;
+    }).join('') + `<button class="chip" id="newCollBtn">＋ 새 컬렉션</button>`;
+    collWrap.querySelectorAll('.coll-chip').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const cid = btn.dataset.cid;
+        const coll = store.collections.find(c=>c.id===cid);
+        if(!note.collectionIds) note.collectionIds = [];
+        if(note.collectionIds.includes(cid)){
+          note.collectionIds = note.collectionIds.filter(x=>x!==cid);
+          coll.noteIds = coll.noteIds.filter(x=>x!==note.id);
+        } else {
+          note.collectionIds.push(cid);
+          coll.noteIds.push(note.id);
+        }
+        drawCollChips();
+      });
+    });
+    collWrap.querySelector('#newCollBtn').addEventListener('click', ()=>{
+      const name = prompt('새 컬렉션 이름을 입력하세요 (예: 이번 주 볼 것)');
+      if(!name) return;
+      const id = 'c'+store.nextCollectionId++;
+      store.collections.push({id, name, noteIds:[note.id]});
+      if(!note.collectionIds) note.collectionIds = [];
+      note.collectionIds.push(id);
+      drawCollChips();
+    });
+  }
+  drawCollChips();
+  backdrop.addEventListener('click', e=>{ if(e.target===backdrop) backdrop.remove(); });
+  backdrop.querySelector('#closeModal').addEventListener('click', ()=> backdrop.remove());
+  backdrop.querySelector('#favToggle').addEventListener('click', (e)=>{
+    note.favorite = !note.favorite;
+    e.target.textContent = note.favorite ? '★' : '☆';
+    e.target.style.color = note.favorite ? 'var(--amber)' : 'var(--paper)';
+  });
+  backdrop.querySelector('#toMindmap').addEventListener('click', ()=>{
+    if(!store.mindmaps[note.subject]) store.mindmaps[note.subject] = {id:'root', label:note.subject, detail:'', children:[]};
+    store.mindmaps[note.subject].children.push({id:'n'+Date.now(), label:note.unit, detail:note.correctConcept, children:[]});
+    showToast('마인드맵에 추가되었습니다');
+  });
+  backdrop.querySelector('#toChunk').addEventListener('click', ()=>{
+    store.chunks.push({id:store.nextChunkId++, text:note.correctConcept.slice(0,40)+'…', subject:note.subject, color:Math.floor(Math.random()*STICKY_COLORS.length), x:40+Math.random()*200, y:40+Math.random()*150});
+    showToast('청킹 보드에 카드가 생성되었습니다');
+  });
+}
+
+/* ---------- 캔버스+OCR (작성) ---------- */
+function renderNotesCapture(root){
+  const wrap = document.createElement('div');
+  wrap.className = 'pad';
+  wrap.innerHTML = `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+      <button class="btn ghost" id="cUpload">업로드</button>
+      <button class="btn ghost" id="cCamera">촬영</button>
+      <button class="btn ghost" id="cPaste">붙여넣기(⌘V)</button>
+      <input type="file" id="cFileInput" accept="image/*" style="display:none;">
+      <input type="file" id="cCameraInput" accept="image/*" capture="environment" style="display:none;">
+    </div>
+    <div id="cToolbar" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+    <div id="cCanvasShell" style="background:var(--desk-2);border-radius:12px;min-height:220px;display:flex;align-items:center;justify-content:center;position:relative;margin-bottom:14px;">
+      <div id="cEmpty" style="color:rgba(var(--text-muted-rgb),0.4);font-size:12.5px;text-align:center;padding:30px;">이미지를 업로드/촬영/붙여넣기 하세요</div>
+      <div id="cStage" hidden style="position:relative;max-width:100%;">
+        <img id="cImg" style="display:block;max-width:100%;max-height:280px;border-radius:6px;">
+        <canvas id="cCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;touch-action:none;"></canvas>
+      </div>
+    </div>
+    <button class="btn blue" id="cAnalyzeBtn" style="margin-bottom:12px;display:none;">이미지 분석하기(OCR)</button>
+    <div id="cOcrResult" style="display:none;margin-bottom:12px;"></div>
+    <div style="margin-bottom:14px;">
+      <label style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;color:rgba(var(--text-muted-rgb),0.45);text-transform:uppercase;display:block;margin-bottom:6px;">추가 이미지 (표·그림 등 여러 장 첨부 가능)</label>
+      <div id="extraImagesRow" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+      <button class="btn ghost" id="addExtraImgBtn" style="margin-top:8px;">＋ 사진 추가</button>
+      <input type="file" id="extraImgInput" accept="image/*" multiple style="display:none;">
+    </div>
+    <div class="row">
+      <div class="field"><label>과목</label><select id="cSubject">${SUBJECTS.map(s=>`<option>${s}</option>`).join('')}</select></div>
+      <div class="field"><label>오답유형</label><select id="cMistake">${MISTAKE_TYPES.map(m=>`<option>${m}</option>`).join('')}</select></div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>정답</label>
+        <input id="cAnswer" placeholder="예: ③, 또는 직접 입력">
+        <div id="cAnswerHint" style="display:none;font-size:10.5px;color:var(--amber-soft);margin-top:2px;">⚠ 필기에서 자동 인식된 값이에요 — 틀렸을 수 있으니 꼭 확인해주세요</div>
+      </div>
+      <div class="field"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>오답 사유</label><textarea id="cWrongReason" placeholder="왜 틀렸는지"></textarea></div>
+      <div class="field"><label>정확한 개념 ★</label><textarea id="cConcept" placeholder="정확한 개념 정리"></textarea></div>
+    </div>
+    <button class="btn primary" id="cSaveBtn" style="margin-top:12px;width:100%;">오답노트 저장</button>
+  `;
+  root.appendChild(wrap);
+
+  let capturedImages = []; // 이 노트에 첨부되는 모든 이미지(메인+추가) dataURL 배열
+  const state = { tool:'ballpoint', color:'#22262F', size:4, hasImage:false, hasAnnotation:false };
+  const canvas = wrap.querySelector('#cCanvas');
+  const ctx = canvas.getContext('2d');
+  const img = wrap.querySelector('#cImg');
+  const stage = wrap.querySelector('#cStage');
+  const empty = wrap.querySelector('#cEmpty');
+  const toolbar = wrap.querySelector('#cToolbar');
+
+  function renderExtraThumbs(){
+    const row = wrap.querySelector('#extraImagesRow');
+    row.innerHTML = capturedImages.map((src,i)=>`
+      <div style="position:relative;width:56px;height:56px;border-radius:8px;overflow:hidden;flex-shrink:0;">
+        <img src="${src}" style="width:100%;height:100%;object-fit:cover;">
+        ${i===0?'<span style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:8px;text-align:center;">메인</span>':`<button class="rm-extra" data-i="${i}" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;border:none;background:rgba(0,0,0,0.5);color:#fff;font-size:9px;cursor:pointer;">×</button>`}
+      </div>`).join('');
+    row.querySelectorAll('.rm-extra').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ capturedImages.splice(parseInt(btn.dataset.i,10),1); renderExtraThumbs(); });
+    });
+  }
+  wrap.querySelector('#addExtraImgBtn').addEventListener('click', ()=> wrap.querySelector('#extraImgInput').click());
+  wrap.querySelector('#extraImgInput').addEventListener('change', (e)=>{
+    [...e.target.files].forEach(f=>{
+      const r = new FileReader();
+      r.onload = ev=>{ capturedImages.push(ev.target.result); renderExtraThumbs(); };
+      r.readAsDataURL(f);
+    });
+  });
+
+
+  const TOOLS = [
+    {k:'ballpoint', label:'볼펜'}, {k:'highlighter', label:'형광펜'}, {k:'eraser', label:'지우개'},
+    {k:'rect', label:'네모'}, {k:'underline', label:'밑줄'},
+  ];
+  TOOLS.forEach(t=>{
+    const b = document.createElement('button');
+    b.className = 'chip' + (t.k===state.tool?' active':'');
+    b.textContent = t.label;
+    b.addEventListener('click', ()=>{
+      state.tool = t.k;
+      toolbar.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+      b.classList.add('active');
+    });
+    toolbar.appendChild(b);
+  });
+
+  function loadImage(src){
+    img.onload = ()=>{
+      empty.hidden = true; stage.hidden = false;
+      const rect = img.getBoundingClientRect();
+      const dpr = window.devicePixelRatio||1;
+      canvas.width = rect.width*dpr; canvas.height = rect.height*dpr;
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      state.hasImage = true;
+      toolbar.style.display = 'flex';
+      wrap.querySelector('#cAnalyzeBtn').style.display = 'inline-block';
+      capturedImages[0] = src;
+      renderExtraThumbs();
+    };
+    img.src = src;
+  }
+  wrap.querySelector('#cUpload').addEventListener('click', ()=> wrap.querySelector('#cFileInput').click());
+  wrap.querySelector('#cCamera').addEventListener('click', ()=> wrap.querySelector('#cCameraInput').click());
+  [wrap.querySelector('#cFileInput'), wrap.querySelector('#cCameraInput')].forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const f = e.target.files[0]; if(!f) return;
+      const r = new FileReader(); r.onload = ev=>loadImage(ev.target.result); r.readAsDataURL(f);
+    });
+  });
+  wrap.querySelector('#cPaste').addEventListener('click', async ()=>{
+    try{
+      const items = await navigator.clipboard.read();
+      for(const ci of items){
+        const t = ci.types.find(x=>x.startsWith('image/'));
+        if(t){ const blob = await ci.getType(t); const r=new FileReader(); r.onload=ev=>loadImage(ev.target.result); r.readAsDataURL(blob); return; }
+      }
+      alert('클립보드에 이미지가 없어요.');
+    }catch(err){ alert('화면을 탭하고 ⌘V로 붙여넣어주세요.'); }
+  });
+  window.addEventListener('paste', (e)=>{
+    if(currentTab!=='notes' || notesSubview!=='capture') return;
+    const items = e.clipboardData?.items; if(!items) return;
+    for(const it of items){ if(it.type.startsWith('image/')){ const f=it.getAsFile(); const r=new FileReader(); r.onload=ev=>loadImage(ev.target.result); r.readAsDataURL(f); e.preventDefault(); break; } }
+  });
+
+  let drawing=false, lastX=0, lastY=0;
+  function pos(e){ const r = canvas.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+  canvas.addEventListener('pointerdown', e=>{
+    if(!state.hasImage) return;
+    canvas.setPointerCapture(e.pointerId);
+    drawing = true; state.hasAnnotation = true; const p = pos(e); lastX=p.x; lastY=p.y;
+  });
+  canvas.addEventListener('pointermove', e=>{
+    if(!drawing) return;
+    const p = pos(e);
+    const pressure = e.pressure>0 ? e.pressure : 0.5;
+    if(state.tool==='eraser'){ ctx.globalCompositeOperation='destination-out'; }
+    else if(state.tool==='highlighter'){ ctx.globalCompositeOperation='multiply'; ctx.globalAlpha=0.35; }
+    else { ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1; }
+    ctx.strokeStyle = state.tool==='eraser' ? '#000' : state.color;
+    ctx.lineWidth = state.tool==='highlighter' ? state.size*2.2 : state.size*(0.6+pressure*0.6);
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(p.x,p.y); ctx.stroke();
+    ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+    lastX=p.x; lastY=p.y;
+  });
+  ['pointerup','pointerleave'].forEach(evt=> canvas.addEventListener(evt, ()=> drawing=false));
+
+  wrap.querySelector('#cAnalyzeBtn').addEventListener('click', function(){
+    this.textContent = '분석 중...'; this.disabled = true;
+    setTimeout(()=>{
+      const mock = {
+        ocrText:'15. 다음 중 영양판정 방법 중 생화학적 방법에 해당하는 것은?',
+        subject:'영양판정', unit:'생화학적 판정', confidence:92, tags:['생화학적판정','혈청알부민'],
+      };
+      let resultHtml = `<div style="background:rgba(62,107,158,0.1);border:1px solid rgba(62,107,158,0.3);border-radius:10px;padding:10px 12px;font-size:12px;">
+        <div style="margin-bottom:6px;">${mock.ocrText}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--blue-soft);">추정 과목 ${mock.subject} (${mock.confidence}%) · ${mock.tags.join(', ')}</div>`;
+      wrap.querySelector('#cSubject').value = mock.subject;
+
+      if(state.hasAnnotation){
+        const detectedAnswer = '③';
+        resultHtml += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(62,107,158,0.25);font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--amber-soft);">✏️ 필기에서 정답 표시 감지: <b>${detectedAnswer}</b> (인식률 낮을 수 있음)</div>`;
+        const answerInput = wrap.querySelector('#cAnswer');
+        answerInput.value = detectedAnswer;
+        wrap.querySelector('#cAnswerHint').style.display = 'block';
+      }
+      resultHtml += `</div>`;
+      wrap.querySelector('#cOcrResult').style.display = 'block';
+      wrap.querySelector('#cOcrResult').innerHTML = resultHtml;
+      this.textContent = '다시 분석'; this.disabled = false;
+    }, 900);
+  }.bind(wrap.querySelector('#cAnalyzeBtn')));
+
+  wrap.querySelector('#cSaveBtn').addEventListener('click', ()=>{
+    const subject = wrap.querySelector('#cSubject').value;
+    const note = {
+      id: store.nextNoteId++,
+      subject, unit: wrap.querySelector('#cOcrResult').style.display==='block' ? '생화학적 판정' : '새 오답노트',
+      tags:[], mistakeType: wrap.querySelector('#cMistake').value,
+      ocrText: '(캡처된 문제 이미지)',
+      answer: wrap.querySelector('#cAnswer').value || '',
+      wrongReason: wrap.querySelector('#cWrongReason').value || '(미입력)',
+      correctConcept: wrap.querySelector('#cConcept').value || '(미입력)',
+      source:'직접 등록', createdAt:'2026-08-08', nextReviewAt:'2026-08-09', masteryLevel:0, reviewCount:0, correctCount:0, wrongCount:0, favorite:false, collectionIds:[], images: capturedImages.slice(),
+    };
+    store.notes.push(note);
+    showToast('오답노트가 저장되었습니다');
+    notesSubview = 'list';
+    switchTab('notes');
+  });
+}
+
+/* ---------- 퀴즈 모드 (자동 객관식 생성) ---------- */
+function renderQuizSetup(root){
+  const wrap = document.createElement('div');
+  wrap.className = 'pad';
+  const state = { subjects:new Set() };
+  wrap.innerHTML = `
+    <div style="font-size:13px;color:rgba(var(--text-muted-rgb),0.6);line-height:1.6;margin-bottom:12px;">저장된 오답노트의 정확한 개념으로 4지선다 문제를 자동 생성합니다. 과목을 선택하지 않으면 전체에서 출제해요.</div>
+    <div class="row" style="margin-bottom:16px;" id="quizSubjChips"></div>
+    <button class="btn primary" id="startQuizBtn" style="width:100%;padding:13px;">퀴즈 시작</button>
+  `;
+  root.appendChild(wrap);
+  SUBJECTS.forEach(s=>{
+    const chip = document.createElement('button');
+    chip.className='chip'; chip.textContent=s;
+    chip.addEventListener('click', ()=>{ state.subjects.has(s)?state.subjects.delete(s):state.subjects.add(s); chip.classList.toggle('active'); });
+    wrap.querySelector('#quizSubjChips').appendChild(chip);
+  });
+  wrap.querySelector('#startQuizBtn').addEventListener('click', ()=>{
+    const pool = state.subjects.size ? store.notes.filter(n=>state.subjects.has(n.subject)) : store.notes;
+    if(pool.length < 2){ alert('퀴즈를 만들려면 오답노트가 최소 2건 이상 필요해요.'); return; }
+    openQuizSession(pool);
+  });
+}
+
+function openQuizSession(pool){
+  let idx = 0, correct = 0, wrong = 0;
+  const questions = [...pool].sort(()=>Math.random()-0.5);
+  const backdrop = document.createElement('div');
+  backdrop.style.cssText = 'position:fixed;inset:0;background:var(--desk);z-index:400;display:flex;flex-direction:column;';
+  document.body.appendChild(backdrop);
+
+  function buildOptions(correctNote){
+    const distractorPool = store.notes.filter(n=>n.id!==correctNote.id && n.correctConcept !== correctNote.correctConcept);
+    const shuffled = distractorPool.sort(()=>Math.random()-0.5);
+    const optionCount = Math.min(4, distractorPool.length+1);
+    const distractors = shuffled.slice(0, optionCount-1).map(n=>n.correctConcept);
+    const options = [correctNote.correctConcept, ...distractors].sort(()=>Math.random()-0.5);
+    return options;
+  }
+
+  function draw(){
+    if(idx >= questions.length){
+      backdrop.innerHTML = `
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;">
+          <div style="font-size:34px;margin-bottom:10px;">📝</div>
+          <div style="font-size:16px;font-weight:700;margin-bottom:6px;">퀴즈 완료!</div>
+          <div style="font-size:13px;color:rgba(var(--text-muted-rgb),0.5);margin-bottom:20px;">정답 ${correct} / ${questions.length} (${Math.round(correct/questions.length*100)}%)</div>
+          <button class="btn primary" id="quizDone">오답노트로</button>
+        </div>`;
+      backdrop.querySelector('#quizDone').addEventListener('click', ()=>{ backdrop.remove(); render(); });
+      return;
+    }
+    const n = questions[idx];
+    const options = buildOptions(n);
+    backdrop.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid rgba(var(--border-rgb),0.08);">
+        <button id="quizClose" style="background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:28px;height:28px;border-radius:50%;cursor:pointer;">✕</button>
+        <div style="flex:1;text-align:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:rgba(var(--text-muted-rgb),0.5);">${idx+1} / ${questions.length}</div>
+        <div style="width:28px;"></div>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:24px;">
+        <div style="font-size:10.5px;font-weight:700;color:var(--amber-soft);text-align:center;margin-bottom:10px;">${n.subject} · ${n.unit}</div>
+        <div style="background:var(--card);border-radius:14px;padding:18px;font-size:13.5px;line-height:1.6;text-align:center;margin-bottom:18px;">${n.ocrText}<br><span style="font-size:11px;color:rgba(var(--text-muted-rgb),0.5);">위 문제에 대한 정확한 개념 설명으로 옳은 것은?</span></div>
+        <div id="quizOptions" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+    `;
+    backdrop.querySelector('#quizClose').addEventListener('click', ()=>{ backdrop.remove(); render(); });
+    const optWrap = backdrop.querySelector('#quizOptions');
+    options.forEach(opt=>{
+      const b = document.createElement('button');
+      b.style.cssText = 'text-align:left;padding:12px 14px;border-radius:10px;border:1.5px solid rgba(var(--border-rgb),0.1);background:var(--desk-2);color:var(--paper);font-size:12.5px;line-height:1.5;cursor:pointer;font-family:"Noto Sans KR",sans-serif;';
+      b.textContent = opt;
+      b.addEventListener('click', ()=>{
+        optWrap.querySelectorAll('button').forEach(x=>x.disabled=true);
+        const isCorrect = opt === n.correctConcept;
+        b.style.borderColor = isCorrect ? 'var(--blue)' : 'var(--danger)';
+        b.style.background = isCorrect ? 'rgba(62,107,158,0.15)' : 'rgba(201,122,82,0.15)';
+        if(!isCorrect){
+          optWrap.querySelectorAll('button').forEach(x=>{ if(x.textContent===n.correctConcept){ x.style.borderColor='var(--blue)'; x.style.background='rgba(62,107,158,0.15)'; } });
+        }
+        const realNote = store.notes.find(x=>x.id===n.id);
+        realNote.reviewCount = (realNote.reviewCount||0)+1;
+        if(isCorrect){ realNote.correctCount=(realNote.correctCount||0)+1; correct++; }
+        else{ realNote.wrongCount=(realNote.wrongCount||0)+1; wrong++; }
+        setTimeout(()=>{ idx++; draw(); }, 900);
+      });
+      optWrap.appendChild(b);
+    });
+  }
+  draw();
+}
+
+/* ============================== MINDMAP ============================== */
+let mmSelectedId = {};
+function renderMindmap(root){
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `<div class="row" style="padding:14px 20px 6px;gap:6px;" id="mmTabs"></div>
+    <div style="display:flex;gap:12px;padding:8px 20px 24px;flex-wrap:wrap;">
+      <div id="mmCanvasShell" style="flex:2;min-width:280px;background:var(--desk-2);border-radius:14px;overflow:auto;max-height:420px;position:relative;">
+        <div id="mmCanvas" style="position:relative;"></div>
+      </div>
+      <div id="mmPanel" style="flex:1;min-width:220px;background:var(--desk-2);border-radius:14px;padding:14px 16px;"></div>
+    </div>`;
+  root.appendChild(wrap);
+
+  const existingSubjects = Object.keys(store.mindmaps);
+  const tabsWrap = wrap.querySelector('#mmTabs');
+  let currentSubject = existingSubjects[0] || null;
+
+  function buildTabs(){
+    tabsWrap.innerHTML = '';
+    existingSubjects.forEach(s=>{
+      const b = document.createElement('button');
+      b.className = 'chip' + (s===currentSubject?' active':'');
+      b.textContent = s;
+      b.addEventListener('click', ()=>{ currentSubject = s; buildTabs(); draw(); });
+      tabsWrap.appendChild(b);
+    });
+    const addSel = document.createElement('select');
+    addSel.className = 'chip';
+    addSel.innerHTML = `<option value="">＋ 새 마인드맵</option>` + SUBJECTS.filter(s=>!store.mindmaps[s]).map(s=>`<option value="${s}">${s}</option>`).join('');
+    addSel.addEventListener('change', ()=>{
+      if(!addSel.value) return;
+      store.mindmaps[addSel.value] = {id:'root', label:addSel.value, detail:'', children:[]};
+      existingSubjects.push(addSel.value);
+      currentSubject = addSel.value;
+      buildTabs(); draw();
+    });
+    tabsWrap.appendChild(addSel);
+  }
+  buildTabs();
+
+  function findNode(node,id){ if(node.id===id) return node; for(const c of node.children){ const f=findNode(c,id); if(f) return f; } return null; }
+  function findParent(node,id,p=null){ if(node.id===id) return p; for(const c of node.children){ const f=findParent(c,id,node); if(f) return f; } return null; }
+
+  function draw(){
+    const panel = wrap.querySelector('#mmPanel');
+    const canvasWrap = wrap.querySelector('#mmCanvas');
+    if(!currentSubject){ canvasWrap.innerHTML=''; panel.innerHTML='<div style="color:rgba(var(--text-muted-rgb),0.35);font-size:12.5px;">마인드맵을 추가해보세요</div>'; return; }
+    const root2 = store.mindmaps[currentSubject];
+    let yc = 0;
+    const W=150,H=36,GX=70,GY=12;
+    (function layout(n,d){
+      n._x = d*(W+GX);
+      if(n.children.length===0){ n._y = yc*(H+GY); yc++; }
+      else { n.children.forEach(c=>layout(c,d+1)); n._y = (n.children[0]._y + n.children[n.children.length-1]._y)/2; }
+    })(root2,0);
+
+    const flat=[]; let maxX=0,maxY=0;
+    (function collect(n){ flat.push(n); maxX=Math.max(maxX,n._x); maxY=Math.max(maxY,n._y); n.children.forEach(collect); })(root2);
+    canvasWrap.style.width = (maxX+W+30)+'px';
+    canvasWrap.style.height = (maxY+H+30)+'px';
+    canvasWrap.innerHTML = `<svg width="${maxX+W+30}" height="${maxY+H+30}" style="position:absolute;top:0;left:0;pointer-events:none;"></svg>`;
+    const svg = canvasWrap.querySelector('svg');
+    (function lines(n){ n.children.forEach(c=>{
+      const x1=n._x+W,y1=n._y+H/2+15,x2=c._x,y2=c._y+H/2+15,mid=(x1+x2)/2;
+      const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+      p.setAttribute('d',`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`);
+      p.setAttribute('stroke','rgba(var(--text-muted-rgb),0.18)'); p.setAttribute('stroke-width','2'); p.setAttribute('fill','none');
+      svg.appendChild(p); lines(c);
+    }); })(root2);
+
+    flat.forEach(n=>{
+      const el = document.createElement('div');
+      const sel = mmSelectedId[currentSubject]===n.id;
+      el.dataset.nodeId = n.id;
+      el.style.cssText = `position:absolute;left:${n._x+15}px;top:${n._y+15}px;max-width:${W}px;background:${n.id==='root'?'var(--amber)':'var(--card)'};color:${n.id==='root'?'#241705':'var(--paper)'};border:1.5px solid ${sel?'var(--amber)':'rgba(var(--border-rgb),0.12)'};border-radius:9px;padding:8px 10px;font-size:12px;font-weight:${n.id==='root'?'700':'500'};cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
+      el.textContent = n.label;
+      el.addEventListener('click', ()=>{ mmSelectedId[currentSubject]=n.id; draw(); });
+      canvasWrap.appendChild(el);
+    });
+
+    const selId = mmSelectedId[currentSubject];
+    const selNode = selId ? findNode(root2, selId) : null;
+    if(!selNode){
+      panel.innerHTML = `<div style="color:rgba(var(--text-muted-rgb),0.35);font-size:12px;line-height:1.6;">노드를 탭하면 상세 개념을 정리할 수 있어요.</div>`;
+      return;
+    }
+    panel.innerHTML = `
+      <div class="field" style="margin-bottom:10px;"><label>키워드</label><input id="mmLabel" value="${selNode.label.replace(/"/g,'&quot;')}"></div>
+      <div class="field" style="margin-bottom:10px;"><label>상세 개념</label><textarea id="mmDetail" style="min-height:100px;">${selNode.detail||''}</textarea></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn blue" id="mmAdd" style="flex:1;">＋ 자식추가</button>
+        ${selNode.id!=='root' ? '<button class="btn danger" id="mmDel">삭제</button>' : ''}
+      </div>
+    `;
+    panel.querySelector('#mmLabel').addEventListener('input', e=>{
+      selNode.label = e.target.value || '새 키워드';
+      const nodeEl = canvasWrap.querySelector(`[data-node-id="${selNode.id}"]`);
+      if(nodeEl) nodeEl.textContent = selNode.label;
+    });
+    panel.querySelector('#mmLabel').addEventListener('blur', ()=> draw());
+    panel.querySelector('#mmDetail').addEventListener('input', e=>{ selNode.detail = e.target.value; });
+    panel.querySelector('#mmAdd').addEventListener('click', ()=>{
+      const id = 'n'+Date.now();
+      selNode.children.push({id,label:'새 키워드',detail:'',children:[]});
+      mmSelectedId[currentSubject] = id;
+      draw();
+    });
+    const delBtn = panel.querySelector('#mmDel');
+    if(delBtn) delBtn.addEventListener('click', ()=>{
+      if(!confirm('이 키워드와 하위 항목을 삭제할까요?')) return;
+      const p = findParent(root2, selNode.id);
+      if(p) p.children = p.children.filter(c=>c.id!==selNode.id);
+      mmSelectedId[currentSubject] = null;
+      draw();
+    });
+  }
+  draw();
+}
+
+/* ============================== CHUNK ============================== */
+function renderChunk(root){
+  const wrap = document.createElement('div');
+  wrap.className = 'pad';
+  wrap.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button class="btn primary" id="addChunkBtn">＋ 새 청크</button>
+    </div>
+    <div id="chunkBoard" style="background:var(--desk-2);border-radius:14px;min-height:320px;position:relative;overflow:auto;padding:6px;"></div>
+  `;
+  root.appendChild(wrap);
+
+  wrap.querySelector('#addChunkBtn').addEventListener('click', ()=>{
+    store.chunks.push({id:store.nextChunkId++, text:'새 청크', subject:SUBJECTS[Math.floor(Math.random()*SUBJECTS.length)], color:Math.floor(Math.random()*STICKY_COLORS.length), x:20+Math.random()*180, y:20+Math.random()*120});
+    draw();
+  });
+
+  function draw(){
+    const board = wrap.querySelector('#chunkBoard');
+    board.innerHTML = '';
+    store.chunks.forEach(chunk=>{
+      const c = STICKY_COLORS[chunk.color];
+      const el = document.createElement('div');
+      el.style.cssText = `position:absolute;left:${chunk.x}px;top:${chunk.y}px;width:150px;min-height:100px;background:${c.bg};color:${c.text};border-radius:4px;padding:10px;box-shadow:0 5px 12px rgba(0,0,0,0.3);cursor:grab;transform:rotate(${((chunk.id*37)%7)-3}deg);touch-action:none;`;
+      el.innerHTML = `
+        <div style="font-size:9.5px;font-weight:700;background:rgba(0,0,0,0.12);display:inline-block;padding:2px 7px;border-radius:999px;margin-bottom:6px;">${chunk.subject}</div>
+        <textarea style="width:100%;border:none;background:none;resize:none;outline:none;font-family:'Noto Sans KR',sans-serif;font-size:11.5px;color:inherit;min-height:50px;">${chunk.text}</textarea>
+        <button class="del" style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;border:none;background:rgba(0,0,0,0.15);color:inherit;font-size:10px;cursor:pointer;">×</button>
+      `;
+      el.querySelector('textarea').addEventListener('input', e=> chunk.text = e.target.value);
+      el.querySelector('.del').addEventListener('click', ()=>{ store.chunks = store.chunks.filter(c2=>c2.id!==chunk.id); draw(); });
+      let dragging=false,sx,sy,ox,oy;
+      el.addEventListener('pointerdown', e=>{
+        if(e.target.tagName==='TEXTAREA'||e.target.tagName==='BUTTON') return;
+        dragging=true; el.setPointerCapture(e.pointerId); sx=e.clientX; sy=e.clientY; ox=chunk.x; oy=chunk.y;
+      });
+      el.addEventListener('pointermove', e=>{
+        if(!dragging) return;
+        chunk.x = Math.max(0, ox+(e.clientX-sx)); chunk.y = Math.max(0, oy+(e.clientY-sy));
+        el.style.left = chunk.x+'px'; el.style.top = chunk.y+'px';
+      });
+      ['pointerup','pointercancel'].forEach(ev=> el.addEventListener(ev, ()=> dragging=false));
+      board.appendChild(el);
+    });
+  }
+  draw();
+}
+
+/* ============================== EXPORT ============================== */
+/* ============================== STATS ============================== */
+function renderStats(root){
+  const wrap = document.createElement('div');
+  wrap.className = 'pad';
+  const notes = store.notes;
+  const totalCorrect = notes.reduce((s,n)=>s+(n.correctCount||0),0);
+  const totalWrong = notes.reduce((s,n)=>s+(n.wrongCount||0),0);
+  const totalAnswers = totalCorrect + totalWrong;
+  const accuracy = totalAnswers ? Math.round(totalCorrect/totalAnswers*100) : 0;
+
+  const bySubject = SUBJECTS.map(s=>({subject:s, count:notes.filter(n=>n.subject===s).length})).filter(x=>x.count>0);
+  const maxSubjectCount = Math.max(1, ...bySubject.map(x=>x.count));
+
+  const byMistake = MISTAKE_TYPES.map(m=>({type:m, count:notes.filter(n=>n.mistakeType===m).length}));
+  const maxMistakeCount = Math.max(1, ...byMistake.map(x=>x.count));
+
+  const byMastery = [0,1,2,3].map(lvl=>({lvl, count:notes.filter(n=>(n.masteryLevel||0)===lvl).length}));
+  const maxMasteryCount = Math.max(1, ...byMastery.map(x=>x.count));
+  const masteryLabels = ['처음','조금 익힘','꽤 익힘','완전 숙지'];
+
+  wrap.innerHTML = `
+    <div style="display:flex;gap:10px;margin-bottom:20px;">
+      <div style="flex:1;background:var(--desk-2);border-radius:14px;padding:16px;text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:4px;">전체 정답률</div>
+        <div style="font-size:30px;font-weight:700;font-family:'Space Grotesk',sans-serif;color:${accuracy>=70?'var(--blue)':'var(--danger)'};">${accuracy}%</div>
+        <div style="font-size:10.5px;color:rgba(var(--text-muted-rgb),0.4);">${totalAnswers}회 복습 중 ${totalCorrect}회 정답</div>
+      </div>
+      <div style="flex:1;background:var(--desk-2);border-radius:14px;padding:16px;text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:4px;">전체 오답노트</div>
+        <div style="font-size:30px;font-weight:700;font-family:'Space Grotesk',sans-serif;">${notes.length}</div>
+        <div style="font-size:10.5px;color:rgba(var(--text-muted-rgb),0.4);">${SUBJECTS.length}개 과목 중 ${bySubject.length}개 과목</div>
+      </div>
+    </div>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.05em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:10px;">과목별 오답노트 수 (취약 과목 파악)</div>
+    <div style="margin-bottom:22px;">
+      ${bySubject.sort((a,b)=>b.count-a.count).map(x=>`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+          <div style="width:90px;font-size:11.5px;color:rgba(var(--text-muted-rgb),0.7);flex-shrink:0;">${x.subject}</div>
+          <div style="flex:1;background:rgba(var(--border-rgb),0.06);border-radius:5px;height:16px;overflow:hidden;">
+            <div style="width:${(x.count/maxSubjectCount*100)}%;height:100%;background:${SUBJECT_COLORS[x.subject]};"></div>
+          </div>
+          <div style="width:22px;font-size:11px;font-family:'JetBrains Mono',monospace;color:rgba(var(--text-muted-rgb),0.5);text-align:right;">${x.count}</div>
+        </div>`).join('')}
+    </div>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.05em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:10px;">오답 유형 분포</div>
+    <div style="margin-bottom:22px;">
+      ${byMistake.map(x=>`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+          <div style="width:90px;font-size:11.5px;color:rgba(var(--text-muted-rgb),0.7);flex-shrink:0;">${x.type}</div>
+          <div style="flex:1;background:rgba(var(--border-rgb),0.06);border-radius:5px;height:16px;overflow:hidden;">
+            <div style="width:${(x.count/maxMistakeCount*100)}%;height:100%;background:var(--amber);"></div>
+          </div>
+          <div style="width:22px;font-size:11px;font-family:'JetBrains Mono',monospace;color:rgba(var(--text-muted-rgb),0.5);text-align:right;">${x.count}</div>
+        </div>`).join('')}
+    </div>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.05em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:10px;">숙련도 분포</div>
+    <div>
+      ${byMastery.map(x=>`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+          <div style="width:90px;font-size:11.5px;color:rgba(var(--text-muted-rgb),0.7);flex-shrink:0;">${masteryLabels[x.lvl]}</div>
+          <div style="flex:1;background:rgba(var(--border-rgb),0.06);border-radius:5px;height:16px;overflow:hidden;">
+            <div style="width:${(x.count/maxMasteryCount*100)}%;height:100%;background:var(--teal);"></div>
+          </div>
+          <div style="width:22px;font-size:11px;font-family:'JetBrains Mono',monospace;color:rgba(var(--text-muted-rgb),0.5);text-align:right;">${x.count}</div>
+        </div>`).join('')}
+    </div>
+  `;
+  root.appendChild(wrap);
+}
+
+function renderExport(root){
+  const wrap = document.createElement('div');
+  wrap.className = 'pad';
+  const state = { includeNotes:true, notesMode:'full', includeMindmap:false, includeChunk:false, subjects:new Set() };
+  wrap.innerHTML = `
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.05em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:8px;">PDF 내보내기</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:8px;background:var(--desk-2);padding:10px 12px;border-radius:10px;font-size:13px;">
+        <input type="checkbox" id="exNotes" checked> 오답노트
+        <select id="exNotesMode" style="margin-left:auto;background:rgba(var(--border-rgb),0.06);border:1px solid rgba(var(--border-rgb),0.1);color:var(--paper);border-radius:6px;padding:4px 8px;font-size:11.5px;">
+          <option value="full">전체</option><option value="concept">개념만★</option>
+        </select>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;background:var(--desk-2);padding:10px 12px;border-radius:10px;font-size:13px;">
+        <input type="checkbox" id="exMindmap"> 마인드맵 (개요 텍스트로)
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;background:var(--desk-2);padding:10px 12px;border-radius:10px;font-size:13px;">
+        <input type="checkbox" id="exChunk"> 청킹 카드
+      </label>
+    </div>
+    <div class="row" id="exSubjects" style="margin-bottom:14px;"></div>
+    <button class="btn primary" id="exGenBtn" style="width:100%;margin-bottom:26px;">PDF 생성 + 다운로드</button>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.05em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:8px;">전체 데이터 백업</div>
+    <div style="background:var(--desk-2);border-radius:12px;padding:14px 15px;margin-bottom:10px;">
+      <div style="font-size:12px;color:rgba(var(--text-muted-rgb),0.5);line-height:1.6;margin-bottom:10px;">오답노트·마인드맵·청킹 데이터 전체를 JSON 파일로 저장합니다. PDF와 달리 나중에 이 앱으로 다시 불러올 수 있어요.</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn blue" id="backupBtn" style="flex:1;">백업 다운로드</button>
+        <button class="btn ghost" id="restoreBtn" style="flex:1;">백업 불러오기</button>
+      </div>
+      <input type="file" id="restoreInput" accept=".json" style="display:none;">
+    </div>
+    ${FIREBASE_ENABLED ? `
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.05em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:8px;">계정</div>
+    <div style="background:var(--desk-2);border-radius:12px;padding:14px 15px;">
+      <div style="font-size:12px;color:rgba(var(--text-muted-rgb),0.6);margin-bottom:10px;">${currentUser ? currentUser.email : ''}로 로그인됨 · 클라우드 저장 중</div>
+      <button class="btn ghost" id="logoutBtn" style="width:100%;">로그아웃</button>
+    </div>` : `
+    <div style="font-size:11px;color:rgba(var(--text-muted-rgb),0.35);line-height:1.6;">현재 데모 모드로 실행 중입니다 (Firebase 미연결). 데이터는 이 브라우저에만 임시 저장돼요.</div>`}
+  `;
+  root.appendChild(wrap);
+
+  wrap.querySelector('#backupBtn').addEventListener('click', ()=>{
+    const data = JSON.stringify(store, null, 2);
+    const blob = new Blob([data], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `오답노트백업_2026-08-08.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    showToast('백업 파일이 다운로드되었습니다');
+  });
+  wrap.querySelector('#restoreBtn').addEventListener('click', ()=> wrap.querySelector('#restoreInput').click());
+  wrap.querySelector('#restoreInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      try{
+        const parsed = JSON.parse(ev.target.result);
+        if(!parsed.notes || !parsed.mindmaps || !parsed.chunks){ throw new Error('형식이 올바르지 않습니다'); }
+        if(!confirm('현재 데이터를 백업 파일 내용으로 교체합니다. 계속할까요?')) return;
+        store = makeReactive(parsed, persistAll);
+        showToast('백업을 불러왔습니다');
+        switchTab('home');
+      }catch(err){
+        alert('백업 파일을 읽을 수 없어요. 이 앱에서 내보낸 JSON 파일인지 확인해주세요.');
+      }
+    };
+    reader.readAsText(file);
+  });
+  const logoutBtn = wrap.querySelector('#logoutBtn');
+  if(logoutBtn) logoutBtn.addEventListener('click', ()=>{ auth.signOut(); });
+
+  SUBJECTS.forEach(s=>{
+    const chip = document.createElement('button');
+    chip.className='chip'; chip.textContent=s;
+    chip.addEventListener('click', ()=>{ state.subjects.has(s)?state.subjects.delete(s):state.subjects.add(s); chip.classList.toggle('active'); });
+    wrap.querySelector('#exSubjects').appendChild(chip);
+  });
+  wrap.querySelector('#exNotes').addEventListener('change', e=> state.includeNotes=e.target.checked);
+  wrap.querySelector('#exNotesMode').addEventListener('change', e=> state.notesMode=e.target.value);
+  wrap.querySelector('#exMindmap').addEventListener('change', e=> state.includeMindmap=e.target.checked);
+  wrap.querySelector('#exChunk').addEventListener('change', e=> state.includeChunk=e.target.checked);
+
+  function outline(node,depth){ let l=[{text:node.label,depth}]; node.children.forEach(c=>l=l.concat(outline(c,depth+1))); return l; }
+
+  wrap.querySelector('#exGenBtn').addEventListener('click', ()=>{
+    const subjectPool = state.subjects.size ? [...state.subjects] : SUBJECTS;
+    const subjects = subjectPool.filter(s=>{
+      const hasN = state.includeNotes && store.notes.some(n=>n.subject===s);
+      const hasM = state.includeMindmap && store.mindmaps[s] && store.mindmaps[s].children.length;
+      const hasC = state.includeChunk && store.chunks.some(c=>c.subject===s);
+      return hasN||hasM||hasC;
+    });
+    if(subjects.length===0){ alert('포함할 콘텐츠와 과목을 선택해주세요.'); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({unit:'mm',format:'a4'});
+    const pageW=210, marginX=18; let y=100;
+    function newPage(){ doc.addPage(); y=22; }
+    function ensure(h){ if(y+h>275) newPage(); }
+
+    doc.setFontSize(20); doc.text('학습 자료 모음', pageW/2, y, {align:'center'});
+    doc.setFontSize(10); doc.text('영양교사 임용시험 1차 대비', pageW/2, y+8, {align:'center'});
+    newPage();
+    doc.setFontSize(14); doc.text('목차', marginX, y); y+=9;
+    doc.setFontSize(10);
+    subjects.forEach(s=>{ doc.text(s, marginX, y); y+=6.5; });
+
+    subjects.forEach(subject=>{
+      newPage();
+      doc.setFontSize(13); doc.setTextColor(184,122,37); doc.text(subject, marginX, y);
+      doc.setDrawColor(232,163,61); doc.line(marginX, y+2, pageW-marginX, y+2);
+      doc.setTextColor(30,30,30); y+=10;
+
+      if(state.includeNotes){
+        const notes = store.notes.filter(n=>n.subject===subject);
+        notes.forEach(n=>{
+          ensure(14);
+          doc.setFontSize(10.5); doc.setFont(undefined,'bold'); doc.text(n.unit, marginX, y);
+          doc.setFont(undefined,'normal');
+          y+=6;
+          doc.setFontSize(9);
+          const cc = doc.splitTextToSize(`정확한 개념: ${n.correctConcept}`, pageW-marginX*2-6);
+          const boxH = cc.length*4.6+5;
+          ensure(boxH+6);
+          doc.setFillColor(251,240,220); doc.rect(marginX, y-3.5, pageW-marginX*2, boxH, 'F');
+          doc.text(cc, marginX+3, y+1);
+          y += boxH+6;
+          if(state.notesMode==='full'){
+            ensure(6);
+            const wr = doc.splitTextToSize(`오답사유: ${n.wrongReason}`, pageW-marginX*2);
+            doc.setFontSize(9); doc.text(wr, marginX, y); y += wr.length*4.6+4;
+          }
+        });
+      }
+      if(state.includeMindmap && store.mindmaps[subject]){
+        ensure(8); doc.setFontSize(10); doc.setTextColor(62,107,158); doc.text('마인드맵 개요', marginX, y); doc.setTextColor(30,30,30); y+=7;
+        outline(store.mindmaps[subject],0).forEach(l=>{ ensure(5.5); doc.setFontSize(9); doc.text(`${l.depth===0?'●':'－'} ${l.text}`, marginX+l.depth*6, y); y+=5.5; });
+        y+=3;
+      }
+      if(state.includeChunk){
+        const chunks = store.chunks.filter(c=>c.subject===subject);
+        if(chunks.length){
+          ensure(8); doc.setFontSize(10); doc.setTextColor(62,107,158); doc.text('청킹 카드', marginX, y); doc.setTextColor(30,30,30); y+=7;
+          chunks.forEach(c=>{ const lines = doc.splitTextToSize('· '+c.text, pageW-marginX*2); ensure(lines.length*4.6+2); doc.setFontSize(9); doc.text(lines, marginX, y); y+=lines.length*4.6+2; });
+        }
+      }
+    });
+    doc.save('학습자료_2026-08-08.pdf');
+  });
+}
+
+/* ============================== INIT / AUTH ============================== */
+const loginGate = document.getElementById('loginGate');
+const appShell = document.querySelector('.topbar');
+
+async function loadStoreFromFirestore(uid){
+  const ref = db.collection('users').doc(uid).collection('data');
+  const [metaSnap, notesSnap, mapsSnap, chunksSnap] = await Promise.all([
+    ref.doc('meta').get(), ref.doc('notes').get(), ref.doc('mindmaps').get(), ref.doc('chunks').get(),
+  ]);
+  const fresh = emptyStore();
+  if(metaSnap.exists){
+    const m = metaSnap.data();
+    fresh.examDate = m.examDate || fresh.examDate;
+    fresh.nextNoteId = m.nextNoteId || 1;
+    fresh.nextChunkId = m.nextChunkId || 1;
+    fresh.nextCollectionId = m.nextCollectionId || 1;
+    fresh.collections = m.collections || [];
+  }
+  if(notesSnap.exists) fresh.notes = notesSnap.data().items || [];
+  if(mapsSnap.exists) fresh.mindmaps = mapsSnap.data().items || {};
+  if(chunksSnap.exists) fresh.chunks = chunksSnap.data().items || [];
+  return fresh;
+}
+
+function showLoginGate(show){
+  loginGate.style.display = show ? 'flex' : 'none';
+  document.querySelectorAll('.topbar, #viewContainer, .bottom-nav').forEach(el=> el.style.display = show ? 'none' : '');
+}
+
+function loginError(msg){
+  const el = document.getElementById('loginError');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+if(FIREBASE_ENABLED){
+  showLoginGate(true);
+  document.getElementById('loginBtn').addEventListener('click', ()=>{
+    const email = document.getElementById('loginEmail').value.trim();
+    const pw = document.getElementById('loginPassword').value;
+    auth.signInWithEmailAndPassword(email, pw).catch(err=> loginError(err.message));
+  });
+  document.getElementById('signupBtn').addEventListener('click', ()=>{
+    const email = document.getElementById('loginEmail').value.trim();
+    const pw = document.getElementById('loginPassword').value;
+    auth.createUserWithEmailAndPassword(email, pw).catch(err=> loginError(err.message));
+  });
+  auth.onAuthStateChanged(async (user)=>{
+    if(user){
+      currentUser = user;
+      const loaded = await loadStoreFromFirestore(user.uid);
+      store = makeReactive(loaded, persistAll);
+      showLoginGate(false);
+      switchTab('home');
+    } else {
+      currentUser = null;
+      showLoginGate(true);
+    }
+  });
+} else {
+  switchTab('home');
+}
+</script>
+</body>
+</html>
