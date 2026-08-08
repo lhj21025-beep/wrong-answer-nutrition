@@ -152,10 +152,11 @@ if(FIREBASE_ENABLED){
 
 /* ============================== STORE ============================== */
 const TODAY = new Date('2026-08-08');
-const SUBJECTS = ['고급영양학+생화학','식품학','조리원리','영양교육 및 상담','영양판정','식사요법','단체급식','생애주기 영양학','식품위생학'];
+const SUBJECTS = ['고급영양학+생화학','식품학','조리원리','영양교육 및 상담','영양판정','식사요법','단체급식','생애주기 영양학','식품위생학','교육학'].sort((a,b)=>a.localeCompare(b,'ko'));
 const SUBJECT_COLORS = {
   '고급영양학+생화학':'#5B6BA8','식품학':'#C97A52','조리원리':'#B4552F','영양교육 및 상담':'#7A5FA8',
   '영양판정':'#3E6B9E','식사요법':'#4FC3C0','단체급식':'#E8A33D','생애주기 영양학':'#6C9A5E','식품위생학':'#8A6D3B',
+  '교육학':'#9A7FBF',
 };
 const MISTAKE_TYPES = ['단순실수','개념미숙지','용어혼동','지문오독'];
 const STICKY_COLORS = [
@@ -1258,7 +1259,7 @@ function renderMindmap(root){
   const wrap = document.createElement('div');
   wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;min-height:0;';
   wrap.innerHTML = `<div class="row" style="padding:14px 20px 6px;gap:6px;flex-shrink:0;" id="mmTabs"></div>
-    <div style="padding:0 20px 6px;font-size:11px;color:rgba(var(--text-muted-rgb),0.4);flex-shrink:0;">💡 중심 키워드 주변의 ＋ 버튼을 눌러 상하좌우로 가지를 뻗어보세요</div>
+    <div style="padding:0 20px 6px;font-size:11px;color:rgba(var(--text-muted-rgb),0.4);flex-shrink:0;">💡 노드의 ＋로 키워드 추가, 노드를 드래그해서 자유롭게 배치할 수 있어요</div>
     <div style="display:flex;gap:12px;padding:8px 20px 20px;flex:1;min-height:320px;">
       <div id="mmCanvasShell" style="flex:2;min-width:280px;background:var(--desk-2);border-radius:14px;overflow:auto;position:relative;">
         <div id="mmCanvas" style="position:relative;"></div>
@@ -1285,7 +1286,7 @@ function renderMindmap(root){
     addSel.innerHTML = `<option value="">＋ 새 마인드맵</option>` + SUBJECTS.filter(s=>!store.mindmaps[s]).map(s=>`<option value="${s}">${s}</option>`).join('');
     addSel.addEventListener('change', ()=>{
       if(!addSel.value) return;
-      store.mindmaps[addSel.value] = {id:'root', label:addSel.value, detail:'', children:[]};
+      store.mindmaps[addSel.value] = {id:'root', label:addSel.value, detail:'', children:[], x:320, y:220};
       existingSubjects.push(addSel.value);
       currentSubject = addSel.value;
       buildTabs(); draw();
@@ -1297,22 +1298,30 @@ function renderMindmap(root){
   function findNode(node,id){ if(node.id===id) return node; for(const c of node.children){ const f=findNode(c,id); if(f) return f; } return null; }
   function findParent(node,id,p=null){ if(node.id===id) return p; for(const c of node.children){ const f=findParent(c,id,node); if(f) return f; } return null; }
 
-  const W=150, H=36, HSTEP=W+70, VSTEP=H+22, DIRS=['right','left','down','up'];
-  const DIR_ARROW = {right:'→',left:'←',down:'↓',up:'↑'};
+  const W=150, H=36;
 
-  function addRootChild(root2, dir){
-    const id = 'n'+Date.now();
-    root2.children.push({id, label:'새 키워드', detail:'', children:[], _dir:dir});
-    mmSelectedId[currentSubject] = id;
-    draw();
-    setTimeout(()=>{ wrap.querySelector('#mmLabel')?.focus(); wrap.querySelector('#mmLabel')?.select(); }, 30);
+  // 레거시 데이터(좌표 없는 노드)에 위치를 자동 배정
+  function ensurePosition(node, parent, siblingIdx){
+    if(node.x===undefined || node.y===undefined){
+      if(!parent){ node.x=320; node.y=220; }
+      else {
+        const angle = (siblingIdx*55 + 20) % 360, rad = angle*Math.PI/180, dist=200;
+        node.x = parent.x + Math.cos(rad)*dist;
+        node.y = parent.y + Math.sin(rad)*dist;
+      }
+    }
+    node.children.forEach((c,i)=> ensurePosition(c, node, i));
   }
+
   function addChildTo(parentNode){
     const id = 'n'+Date.now();
-    parentNode.children.push({id, label:'새 키워드', detail:'', children:[]});
+    const idx = parentNode.children.length;
+    const angle = (idx*55 + 20) % 360, rad = angle*Math.PI/180, dist=200;
+    const newNode = {id, label:'', detail:'', children:[], x:parentNode.x+Math.cos(rad)*dist, y:parentNode.y+Math.sin(rad)*dist};
+    parentNode.children.push(newNode);
     mmSelectedId[currentSubject] = id;
     draw();
-    setTimeout(()=>{ wrap.querySelector('#mmLabel')?.focus(); wrap.querySelector('#mmLabel')?.select(); }, 30);
+    startInlineEdit(id);
   }
   function deleteNode(root2, id){
     if(!confirm('이 키워드와 하위 항목을 삭제할까요?')) return;
@@ -1322,55 +1331,25 @@ function renderMindmap(root){
     draw();
   }
 
+  let editingId = null;
+  function startInlineEdit(id){
+    editingId = id;
+    draw();
+  }
+
   function draw(){
     const panel = wrap.querySelector('#mmPanel');
     const canvasWrap = wrap.querySelector('#mmCanvas');
     if(!currentSubject){ canvasWrap.innerHTML=''; panel.innerHTML='<div style="color:rgba(var(--text-muted-rgb),0.35);font-size:12.5px;">마인드맵을 추가해보세요</div>'; return; }
     const root2 = store.mindmaps[currentSubject];
-
-    // ---------- 방향(상하좌우) 배정 ----------
-    root2.children.forEach((c,i)=>{ if(!c._dir) c._dir = DIRS[i%4]; });
-    const counters = {right:0,left:0,down:0,up:0};
-    function layoutBranch(node, depth, dir){
-      node._dir = dir;
-      node._main = (dir==='right'||dir==='left') ? depth*HSTEP : depth*VSTEP;
-      if(node.children.length===0){
-        node._cross = counters[dir] * ((dir==='right'||dir==='left') ? VSTEP : HSTEP);
-        counters[dir]++;
-      } else {
-        node.children.forEach(c=>layoutBranch(c, depth+1, dir));
-        node._cross = (node.children[0]._cross + node.children[node.children.length-1]._cross)/2;
-      }
-    }
-    root2.children.forEach(c=> layoutBranch(c, 1, c._dir));
+    ensurePosition(root2, null, 0);
 
     const flatAll = []; (function collect(n){ flatAll.push(n); n.children.forEach(collect); })(root2);
-    root2._x = 0; root2._y = 0;
-    flatAll.forEach(n=>{
-      if(n===root2) return;
-      if(n._dir==='right'){ n._x=n._main; n._y=n._cross; }
-      else if(n._dir==='left'){ n._x=-n._main-W; n._y=n._cross; }
-      else if(n._dir==='down'){ n._y=n._main; n._x=n._cross; }
-      else { n._y=-n._main-H; n._x=n._cross; }
-    });
-    DIRS.forEach(dir=>{
-      const group = flatAll.filter(n=>n._dir===dir);
-      if(group.length===0) return;
-      if(dir==='right'||dir==='left'){
-        const mid=(Math.min(...group.map(n=>n._y))+Math.max(...group.map(n=>n._y)))/2;
-        group.forEach(n=> n._y -= mid);
-      } else {
-        const mid=(Math.min(...group.map(n=>n._x))+Math.max(...group.map(n=>n._x)))/2;
-        group.forEach(n=> n._x -= mid);
-      }
-    });
 
-    let minX=-W/2,minY=-H/2,maxX=W/2,maxY=H/2;
-    flatAll.forEach(n=>{ minX=Math.min(minX,n._x); minY=Math.min(minY,n._y); maxX=Math.max(maxX,n._x+W); maxY=Math.max(maxY,n._y+H); });
-    const PAD=54;
-    const offX=-minX+PAD, offY=-minY+PAD;
-    root2._x += offX; root2._y += offY;
-    flatAll.forEach(n=>{ n._x+=offX; n._y+=offY; });
+    let minX=root2.x, minY=root2.y, maxX=root2.x+W, maxY=root2.y+H;
+    flatAll.forEach(n=>{ minX=Math.min(minX,n.x); minY=Math.min(minY,n.y); maxX=Math.max(maxX,n.x+W); maxY=Math.max(maxY,n.y+H); });
+    const PAD=60;
+    const offX = -minX+PAD, offY = -minY+PAD;
     const totalW = maxX-minX+PAD*2, totalH = maxY-minY+PAD*2;
 
     canvasWrap.style.width = totalW+'px';
@@ -1378,75 +1357,118 @@ function renderMindmap(root){
     canvasWrap.innerHTML = `<svg width="${totalW}" height="${totalH}" style="position:absolute;top:0;left:0;pointer-events:none;"></svg>`;
     const svg = canvasWrap.querySelector('svg');
 
-    function edge(n){
+    function edgePoints(px,py,cx,cy){
+      const dx = cx-px, dy = cy-py;
+      let x1,y1,x2,y2;
+      if(Math.abs(dx) >= Math.abs(dy)){
+        x1 = px + (dx>=0 ? W : 0); y1 = py+H/2;
+        x2 = cx + (dx>=0 ? 0 : W); y2 = cy+H/2;
+      } else {
+        x1 = px+W/2; y1 = py + (dy>=0 ? H : 0);
+        x2 = cx+W/2; y2 = cy + (dy>=0 ? 0 : H);
+      }
+      return [x1,y1,x2,y2];
+    }
+    function drawEdges(n){
       n.children.forEach(c=>{
-        const dir = c._dir;
-        let x1,y1,x2,y2;
-        if(dir==='right'){ x1=n._x+W; y1=n._y+H/2; x2=c._x; y2=c._y+H/2; }
-        else if(dir==='left'){ x1=n._x; y1=n._y+H/2; x2=c._x+W; y2=c._y+H/2; }
-        else if(dir==='down'){ x1=n._x+W/2; y1=n._y+H; x2=c._x+W/2; y2=c._y; }
-        else { x1=n._x+W/2; y1=n._y; x2=c._x+W/2; y2=c._y+H; }
+        const [x1,y1,x2,y2] = edgePoints(n.x+offX, n.y+offY, c.x+offX, c.y+offY);
+        const midX=(x1+x2)/2, midY=(y1+y2)/2;
         const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-        let d;
-        if(dir==='right'||dir==='left'){ const mid=(x1+x2)/2; d=`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`; }
-        else { const mid=(y1+y2)/2; d=`M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2}`; }
+        const horiz = Math.abs(x2-x1) >= Math.abs(y2-y1);
+        const d = horiz
+          ? `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`
+          : `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
         p.setAttribute('d', d);
         p.setAttribute('stroke','rgba(var(--text-muted-rgb),0.18)'); p.setAttribute('stroke-width','2'); p.setAttribute('fill','none');
         svg.appendChild(p);
-        edge(c);
+        drawEdges(c);
       });
     }
-    edge(root2);
+    drawEdges(root2);
+
+    function updateEdgesFor(){ svg.innerHTML=''; drawEdges(root2); }
 
     flatAll.forEach(n=>{
       const el = document.createElement('div');
       const sel = mmSelectedId[currentSubject]===n.id;
       el.dataset.nodeId = n.id;
-      el.style.cssText = `position:absolute;left:${n._x}px;top:${n._y}px;width:${W}px;height:${H}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:var(--card);color:var(--paper);border:1.5px solid ${sel?'var(--amber)':'rgba(var(--border-rgb),0.12)'};border-radius:9px;padding:0 10px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
-      el.textContent = n.label;
-      el.addEventListener('click', ()=>{ mmSelectedId[currentSubject]=n.id; draw(); });
+      const sx = n.x+offX, sy = n.y+offY;
+      el.style.cssText = `position:absolute;left:${sx}px;top:${sy}px;width:${W}px;height:${H}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:${n.id==='root'?'var(--amber)':'var(--card)'};color:${n.id==='root'?'#241705':'var(--paper)'};border:1.5px solid ${sel?'var(--amber)':'rgba(var(--border-rgb),0.12)'};border-radius:9px;padding:0 8px;font-size:12px;font-weight:${n.id==='root'?'700':'500'};cursor:grab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;touch-action:none;`;
+
+      if(editingId === n.id){
+        el.style.overflow = 'visible';
+        el.innerHTML = `<input id="inlineEdit" value="${(n.label||'').replace(/"/g,'&quot;')}" placeholder="키워드 입력" style="width:100%;height:100%;background:var(--desk-2);border:1.5px solid var(--blue);border-radius:8px;color:var(--paper);font-size:12px;text-align:center;padding:0 6px;box-sizing:border-box;">`;
+      } else {
+        el.textContent = n.label || '(입력 필요)';
+        el.addEventListener('click', (e)=>{
+          if(dragMoved) return;
+          mmSelectedId[currentSubject]=n.id; draw();
+        });
+      }
       canvasWrap.appendChild(el);
 
-      // 바깥쪽 방향으로 이어지는 ＋ 버튼
-      const addBtn = document.createElement('button');
-      addBtn.textContent = '＋';
-      addBtn.title = '이 가지에 키워드 추가';
-      const btnStyle = 'position:absolute;width:20px;height:20px;border-radius:50%;border:none;background:var(--blue);color:#fff;font-size:12px;cursor:pointer;line-height:20px;padding:0;';
-      if(n._dir==='right') addBtn.style.cssText = btnStyle + `left:${n._x+W+6}px;top:${n._y+H/2-10}px;`;
-      else if(n._dir==='left') addBtn.style.cssText = btnStyle + `left:${n._x-26}px;top:${n._y+H/2-10}px;`;
-      else if(n._dir==='down') addBtn.style.cssText = btnStyle + `left:${n._x+W/2-10}px;top:${n._y+H+6}px;`;
-      else addBtn.style.cssText = btnStyle + `left:${n._x+W/2-10}px;top:${n._y-26}px;`;
-      addBtn.addEventListener('click', (e)=>{ e.stopPropagation(); addChildTo(n); });
-      canvasWrap.appendChild(addBtn);
+      if(editingId !== n.id){
+        const addBtn = document.createElement('button');
+        addBtn.textContent = '＋';
+        addBtn.title = '자식 키워드 추가';
+        addBtn.style.cssText = `position:absolute;left:${sx+W-9}px;top:${sy+H-9}px;width:19px;height:19px;border-radius:50%;border:none;background:var(--blue);color:#fff;font-size:12px;cursor:pointer;line-height:19px;padding:0;`;
+        addBtn.addEventListener('click', (e)=>{ e.stopPropagation(); addChildTo(n); });
+        canvasWrap.appendChild(addBtn);
 
-      if(n.id !== 'root'){
-        const delBtn = document.createElement('button');
-        delBtn.textContent = '×';
-        delBtn.title = '삭제';
-        delBtn.style.cssText = `position:absolute;left:${n._x+W-9}px;top:${n._y-9}px;width:18px;height:18px;border-radius:50%;border:none;background:var(--danger);color:#fff;font-size:11px;cursor:pointer;line-height:18px;padding:0;`;
-        delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); deleteNode(root2, n.id); });
-        canvasWrap.appendChild(delBtn);
+        if(n.id !== 'root'){
+          const delBtn = document.createElement('button');
+          delBtn.textContent = '×';
+          delBtn.title = '삭제';
+          delBtn.style.cssText = `position:absolute;left:${sx+W-9}px;top:${sy-9}px;width:18px;height:18px;border-radius:50%;border:none;background:var(--danger);color:#fff;font-size:11px;cursor:pointer;line-height:18px;padding:0;`;
+          delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); deleteNode(root2, n.id); });
+          canvasWrap.appendChild(delBtn);
+        }
       }
-    });
 
-    // 루트 전용: 4방향 추가 버튼
-    DIRS.forEach(dir=>{
-      const b = document.createElement('button');
-      b.textContent = '＋ '+DIR_ARROW[dir];
-      b.title = dir+'쪽으로 새 가지';
-      const base = 'position:absolute;border-radius:999px;border:1px dashed rgba(var(--border-rgb),0.3);background:var(--desk-2);color:rgba(var(--text-muted-rgb),0.6);font-size:10.5px;padding:3px 8px;cursor:pointer;';
-      if(dir==='right') b.style.cssText = base + `left:${root2._x+W+30}px;top:${root2._y+H/2-11}px;`;
-      else if(dir==='left') b.style.cssText = base + `left:${root2._x-70}px;top:${root2._y+H/2-11}px;`;
-      else if(dir==='down') b.style.cssText = base + `left:${root2._x+W/2-24}px;top:${root2._y+H+30}px;`;
-      else b.style.cssText = base + `left:${root2._x+W/2-24}px;top:${root2._y-58}px;`;
-      b.addEventListener('click', ()=> addRootChild(root2, dir));
-      canvasWrap.appendChild(b);
+      // ---------- 드래그 ----------
+      let dragging=false, sxStart=0, syStart=0, oxStart=0, oyStart=0;
+      el.addEventListener('pointerdown', (e)=>{
+        if(editingId === n.id) return;
+        dragging = true; dragMoved = false;
+        el.style.cursor = 'grabbing';
+        el.setPointerCapture(e.pointerId);
+        sxStart=e.clientX; syStart=e.clientY; oxStart=n.x; oyStart=n.y;
+      });
+      el.addEventListener('pointermove', (e)=>{
+        if(!dragging) return;
+        const dx = e.clientX-sxStart, dy = e.clientY-syStart;
+        if(Math.abs(dx)>3 || Math.abs(dy)>3) dragMoved = true;
+        n.x = oxStart+dx; n.y = oyStart+dy;
+        el.style.left = (n.x+offX)+'px'; el.style.top = (n.y+offY)+'px';
+        updateEdgesFor();
+      });
+      ['pointerup','pointercancel'].forEach(evt=>{
+        el.addEventListener(evt, ()=>{
+          if(!dragging) return;
+          dragging = false; el.style.cursor='grab';
+          if(dragMoved) draw();
+        });
+      });
     });
+    let dragMoved = false;
+
+    const inlineInput = canvasWrap.querySelector('#inlineEdit');
+    if(inlineInput){
+      inlineInput.focus(); inlineInput.select();
+      const commit = ()=>{
+        const node = findNode(root2, editingId);
+        if(node) node.label = inlineInput.value.trim() || '새 키워드';
+        editingId = null;
+        draw();
+      };
+      inlineInput.addEventListener('blur', commit);
+      inlineInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); inlineInput.blur(); } });
+    }
 
     const selId = mmSelectedId[currentSubject];
     const selNode = selId ? findNode(root2, selId) : null;
     if(!selNode){
-      panel.innerHTML = `<div style="color:rgba(var(--text-muted-rgb),0.35);font-size:12px;line-height:1.6;">노드를 탭하면 상세 개념을 정리할 수 있어요.<br><br>캔버스 위 <b style="color:var(--blue-soft)">＋</b> 버튼으로 원하는 방향에 바로 키워드를 추가할 수 있어요.</div>`;
+      panel.innerHTML = `<div style="color:rgba(var(--text-muted-rgb),0.35);font-size:12px;line-height:1.6;">노드를 탭하면 상세 개념을 정리할 수 있어요.<br><br>노드 우측 하단 <b style="color:var(--blue-soft)">＋</b> 로 자식 키워드를 바로 추가하고, 노드를 드래그해서 원하는 위치로 옮길 수 있어요.</div>`;
       return;
     }
     panel.innerHTML = `
@@ -1476,7 +1498,8 @@ function renderChunk(root){
   const wrap = document.createElement('div');
   wrap.className = 'pad';
   wrap.innerHTML = `
-    <div style="display:flex;gap:8px;margin-bottom:12px;">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <select id="chunkSubjectSelect" style="background:var(--desk-2);border:1px solid rgba(var(--border-rgb),0.1);color:var(--paper);border-radius:999px;padding:9px 12px;font-size:12.5px;">${SUBJECTS.map(s=>`<option>${s}</option>`).join('')}</select>
       <button class="btn primary" id="addChunkBtn">＋ 새 청크</button>
     </div>
     <div id="chunkBoard" style="background:var(--desk-2);border-radius:14px;min-height:320px;position:relative;overflow:auto;padding:6px;"></div>
@@ -1484,7 +1507,8 @@ function renderChunk(root){
   root.appendChild(wrap);
 
   wrap.querySelector('#addChunkBtn').addEventListener('click', ()=>{
-    store.chunks.push({id:store.nextChunkId++, text:'새 청크', subject:SUBJECTS[Math.floor(Math.random()*SUBJECTS.length)], color:Math.floor(Math.random()*STICKY_COLORS.length), x:20+Math.random()*180, y:20+Math.random()*120});
+    const subject = wrap.querySelector('#chunkSubjectSelect').value;
+    store.chunks.push({id:store.nextChunkId++, text:'새 청크', subject, color:Math.floor(Math.random()*STICKY_COLORS.length), x:20+Math.random()*180, y:20+Math.random()*120});
     draw();
   });
 
