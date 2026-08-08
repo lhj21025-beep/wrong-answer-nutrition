@@ -106,6 +106,9 @@
   <span class="app-title" id="topTitle">홈</span>
   <span class="sub" id="topSub">영양교사 임용시험 학습 앱</span>
   <button id="themeToggle" style="background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;flex-shrink:0;margin-left:auto;">🌙</button>
+  <button id="logoutTopBtn" title="로그아웃" style="display:none;background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:13px;flex-shrink:0;">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+  </button>
 </div>
 
 <div id="viewContainer"></div>
@@ -163,6 +166,7 @@ const STICKY_COLORS = [
 
 const DEMO_SEED_STORE = {
   examDate: '2026-11-08',
+  showDday: true,
   notes: [
     {id:1, subject:'영양판정', unit:'생화학적 판정', tags:['혈청알부민'], mistakeType:'개념미숙지',
      ocrText:'다음 중 영양판정 방법 중 생화학적 방법에 해당하는 것은?', answer:'③',
@@ -220,7 +224,7 @@ const DEMO_SEED_STORE = {
 };
 
 function emptyStore(){
-  return { examDate:'2026-11-08', notes:[], mindmaps:{}, chunks:[], collections:[], nextNoteId:1, nextChunkId:1, nextCollectionId:1 };
+  return { examDate:'2026-11-08', showDday:true, notes:[], mindmaps:{}, chunks:[], collections:[], nextNoteId:1, nextChunkId:1, nextCollectionId:1 };
 }
 
 /* ---------- 반응형 store: 어디서든 값을 바꾸면 자동으로 Firestore에 저장(디바운스) ---------- */
@@ -238,7 +242,7 @@ function persistAll(){
   clearTimeout(persistTimer);
   persistTimer = setTimeout(()=>{
     const ref = db.collection('users').doc(currentUser.uid).collection('data');
-    ref.doc('meta').set({ examDate: store.examDate, nextNoteId: store.nextNoteId, nextChunkId: store.nextChunkId, nextCollectionId: store.nextCollectionId, collections: store.collections });
+    ref.doc('meta').set({ examDate: store.examDate, showDday: store.showDday, nextNoteId: store.nextNoteId, nextChunkId: store.nextChunkId, nextCollectionId: store.nextCollectionId, collections: store.collections });
     ref.doc('notes').set({ items: store.notes });
     ref.doc('mindmaps').set({ items: store.mindmaps });
     ref.doc('chunks').set({ items: store.chunks });
@@ -329,11 +333,17 @@ function renderHome(root){
   const wrap = document.createElement('div');
   wrap.className = 'pad';
   wrap.innerHTML = `
-    <div id="ddayBar" style="display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:14px;cursor:pointer;">
+    ${store.showDday ? `
+    <div id="ddayBar" style="display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:14px;cursor:pointer;position:relative;">
       <span style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--amber-soft);">${dday>=0?`D-${dday}`:`D+${-dday}`}</span>
       <span style="font-size:12px;color:rgba(var(--text-muted-rgb),0.5);">시험일 ${store.examDate} · 탭해서 변경</span>
       <input type="date" id="examDateInput" value="${store.examDate}" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;">
-    </div>
+      <button id="ddayOffBtn" title="D-Day 표시 끄기" style="margin-left:auto;background:rgba(var(--border-rgb),0.08);border:none;color:rgba(var(--text-muted-rgb),0.5);width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:11px;flex-shrink:0;">✕</button>
+    </div>` : `
+    <div id="ddayOffBar" style="display:flex;align-items:center;justify-content:space-between;padding:4px 2px;margin-bottom:14px;cursor:pointer;">
+      <span style="font-size:11px;color:rgba(var(--text-muted-rgb),0.35);">D-Day 표시 꺼짐</span>
+      <span style="font-size:11px;color:var(--blue-soft);font-weight:700;">켜기</span>
+    </div>`}
     ${totalDue>0 ? `<button class="btn primary" id="startReviewBtn" style="width:100%;margin-bottom:14px;padding:13px;font-size:14px;">오늘의 복습 시작하기 (${totalDue}건)</button>` : `<div style="background:var(--desk-2);border-radius:12px;padding:13px;text-align:center;font-size:12.5px;color:rgba(var(--text-muted-rgb),0.4);margin-bottom:14px;">오늘 복습할 오답노트가 없어요 🎉</div>`}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px;">
       <div style="background:var(--desk-2);border-radius:var(--radius);padding:13px 15px;">
@@ -362,17 +372,30 @@ function renderHome(root){
   `;
   root.appendChild(wrap);
 
-  wrap.querySelector('#ddayBar').style.position = 'relative';
-  const dateInput = wrap.querySelector('#examDateInput');
-  wrap.querySelector('#ddayBar').addEventListener('click', ()=>{
-    dateInput.style.pointerEvents='auto'; dateInput.style.opacity='0';
-    dateInput.showPicker ? dateInput.showPicker() : dateInput.click();
-  });
-  dateInput.addEventListener('change', e=>{
-    store.examDate = e.target.value;
-    showToast('시험일이 변경되었습니다');
-    render();
-  });
+  if(store.showDday){
+    const ddayBar = wrap.querySelector('#ddayBar');
+    const dateInput = wrap.querySelector('#examDateInput');
+    ddayBar.addEventListener('click', (e)=>{
+      if(e.target.id === 'ddayOffBtn') return;
+      dateInput.style.pointerEvents='auto'; dateInput.style.opacity='0';
+      dateInput.showPicker ? dateInput.showPicker() : dateInput.click();
+    });
+    dateInput.addEventListener('change', e=>{
+      store.examDate = e.target.value;
+      showToast('시험일이 변경되었습니다');
+      render();
+    });
+    wrap.querySelector('#ddayOffBtn').addEventListener('click', (e)=>{
+      e.stopPropagation();
+      store.showDday = false;
+      render();
+    });
+  } else {
+    wrap.querySelector('#ddayOffBar').addEventListener('click', ()=>{
+      store.showDday = true;
+      render();
+    });
+  }
   const reviewBtn = wrap.querySelector('#startReviewBtn');
   if(reviewBtn) reviewBtn.addEventListener('click', ()=> openReviewSession(dueNotes));
 
@@ -1233,13 +1256,14 @@ function openQuizSession(pool){
 let mmSelectedId = {};
 function renderMindmap(root){
   const wrap = document.createElement('div');
-  wrap.innerHTML = `<div class="row" style="padding:14px 20px 6px;gap:6px;" id="mmTabs"></div>
-    <div style="padding:0 20px 6px;font-size:11px;color:rgba(var(--text-muted-rgb),0.4);">💡 중심 키워드 주변의 ＋ 버튼을 눌러 상하좌우로 가지를 뻗어보세요</div>
-    <div style="display:flex;gap:12px;padding:8px 20px 24px;flex-wrap:wrap;">
-      <div id="mmCanvasShell" style="flex:2;min-width:280px;background:var(--desk-2);border-radius:14px;overflow:auto;max-height:460px;position:relative;">
+  wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;min-height:0;';
+  wrap.innerHTML = `<div class="row" style="padding:14px 20px 6px;gap:6px;flex-shrink:0;" id="mmTabs"></div>
+    <div style="padding:0 20px 6px;font-size:11px;color:rgba(var(--text-muted-rgb),0.4);flex-shrink:0;">💡 중심 키워드 주변의 ＋ 버튼을 눌러 상하좌우로 가지를 뻗어보세요</div>
+    <div style="display:flex;gap:12px;padding:8px 20px 20px;flex:1;min-height:320px;">
+      <div id="mmCanvasShell" style="flex:2;min-width:280px;background:var(--desk-2);border-radius:14px;overflow:auto;position:relative;">
         <div id="mmCanvas" style="position:relative;"></div>
       </div>
-      <div id="mmPanel" style="flex:1;min-width:220px;background:var(--desk-2);border-radius:14px;padding:14px 16px;"></div>
+      <div id="mmPanel" style="flex:1;min-width:220px;max-width:320px;background:var(--desk-2);border-radius:14px;padding:14px 16px;overflow-y:auto;"></div>
     </div>`;
   root.appendChild(wrap);
 
@@ -1748,6 +1772,7 @@ function attachRealtimeListeners(uid){
     if(snap.exists){
       const m = snap.data();
       store.examDate = m.examDate || store.examDate;
+      store.showDday = (m.showDday !== undefined) ? m.showDday : store.showDday;
       store.nextNoteId = m.nextNoteId || store.nextNoteId;
       store.nextChunkId = m.nextChunkId || store.nextChunkId;
       store.nextCollectionId = m.nextCollectionId || store.nextCollectionId;
@@ -1803,16 +1828,22 @@ if(FIREBASE_ENABLED){
     const pw = document.getElementById('loginPassword').value;
     auth.createUserWithEmailAndPassword(email, pw).catch(err=> loginError(err.message));
   });
+  document.getElementById('logoutTopBtn').addEventListener('click', ()=>{
+    if(confirm('로그아웃할까요?')) auth.signOut();
+  });
   auth.onAuthStateChanged((user)=>{
+    const logoutTopBtn = document.getElementById('logoutTopBtn');
     if(user){
       currentUser = user;
       store = makeReactive(emptyStore(), persistAll);
       showLoginGate(false);
+      logoutTopBtn.style.display = '';
       switchTab('home');
       attachRealtimeListeners(user.uid);
     } else {
       currentUser = null;
       detachRealtimeListeners();
+      logoutTopBtn.style.display = 'none';
       showLoginGate(true);
     }
   });
