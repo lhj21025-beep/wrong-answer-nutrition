@@ -159,6 +159,7 @@ const SUBJECT_COLORS = {
   '교육학':'#9A7FBF',
 };
 const MISTAKE_TYPES = ['단순실수','개념미숙지','용어혼동','지문오독'];
+function subjectBadge(s){ return s.length <= 5 ? s : s.slice(0,4)+'…'; }
 const STICKY_COLORS = [
   {name:'주황', bg:'#F6DDAF', text:'#5A3B0C'}, {name:'파랑', bg:'#B9CEE3', text:'#1F3A56'},
   {name:'청록', bg:'#BEEAE0', text:'#134A3D'}, {name:'코랄', bg:'#F5C7B0', text:'#6E3417'},
@@ -238,8 +239,11 @@ function makeReactive(obj, onChange){
   });
 }
 let persistTimer = null;
+let lastLocalMutationAt = 0;
 function persistAll(){
-  if(!FIREBASE_ENABLED || !currentUser || suppressPersist) return;
+  if(suppressPersist) return; // 원격(내 것 포함) 변경 적용 중 — 로컬 편집으로 기록하지 않음
+  lastLocalMutationAt = Date.now();
+  if(!FIREBASE_ENABLED || !currentUser) return;
   clearTimeout(persistTimer);
   persistTimer = setTimeout(()=>{
     const ref = db.collection('users').doc(currentUser.uid).collection('data');
@@ -654,8 +658,8 @@ function renderNotesList(root){
       list.map(n=>{
         const due = isDue(n.nextReviewAt);
         return `<div class="note-card" data-id="${n.id}" style="background:var(--card);border-radius:12px;overflow:hidden;cursor:pointer;border:1px solid rgba(var(--border-rgb),0.05);">
-          <div style="height:60px;background:${SUBJECT_COLORS[n.subject]};display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;position:relative;">
-            ${n.subject[0]}
+          <div style="height:60px;background:${SUBJECT_COLORS[n.subject]};display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:700;position:relative;padding:0 34px;text-align:center;line-height:1.25;">
+            ${subjectBadge(n.subject)}
             <button class="fav-star" data-id="${n.id}" style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.35);border:none;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;color:${n.favorite?'var(--amber)':'rgba(var(--border-rgb),0.6)'};">${n.favorite?'★':'☆'}</button>
             <span style="position:absolute;top:6px;right:6px;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;background:${due?'var(--danger)':'rgba(0,0,0,0.35)'};color:${due?'#fff':'var(--amber-soft)'};">${ddayStr(n.nextReviewAt)}</span>
           </div>
@@ -1791,6 +1795,10 @@ function maybeRender(){
 
 function attachRealtimeListeners(uid){
   const ref = db.collection('users').doc(uid).collection('data');
+  const RECENT_MS = 2500;
+  function maybeRenderFromRemote(){
+    if(Date.now() - lastLocalMutationAt > RECENT_MS) maybeRender();
+  }
   const un1 = ref.doc('meta').onSnapshot(snap=>{
     suppressPersist = true;
     if(snap.exists){
@@ -1803,25 +1811,25 @@ function attachRealtimeListeners(uid){
       store.collections = m.collections || [];
     }
     suppressPersist = false;
-    maybeRender();
+    maybeRenderFromRemote();
   });
   const un2 = ref.doc('notes').onSnapshot(snap=>{
     suppressPersist = true;
     store.notes = snap.exists ? (snap.data().items || []) : [];
     suppressPersist = false;
-    maybeRender();
+    maybeRenderFromRemote();
   });
   const un3 = ref.doc('mindmaps').onSnapshot(snap=>{
     suppressPersist = true;
     store.mindmaps = snap.exists ? (snap.data().items || {}) : {};
     suppressPersist = false;
-    maybeRender();
+    maybeRenderFromRemote();
   });
   const un4 = ref.doc('chunks').onSnapshot(snap=>{
     suppressPersist = true;
     store.chunks = snap.exists ? (snap.data().items || []) : [];
     suppressPersist = false;
-    maybeRender();
+    maybeRenderFromRemote();
   });
   unsubscribeFns = [un1, un2, un3, un4];
 }
