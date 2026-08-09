@@ -1665,6 +1665,22 @@ async function ensureKoreanFont(doc){
   doc.setFont('NanumGothic', 'normal');
 }
 
+function loadImageDims(dataUrl){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = ()=> resolve({w:img.naturalWidth, h:img.naturalHeight});
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+function imageFormatOf(dataUrl){
+  const m = dataUrl.match(/^data:image\/(\w+);base64,/);
+  if(!m) return 'JPEG';
+  const t = m[1].toLowerCase();
+  if(t==='jpg') return 'JPEG';
+  return t.toUpperCase();
+}
+
 function renderExport(root){
   const wrap = document.createElement('div');
   wrap.className = 'pad';
@@ -1785,7 +1801,7 @@ function renderExport(root){
     doc.setFontSize(10);
     subjects.forEach(s=>{ doc.text(s, marginX, y); y+=6.5; });
 
-    subjects.forEach(subject=>{
+    for(const subject of subjects){
       newPage();
       doc.setFontSize(13); doc.setTextColor(184,122,37); doc.text(subject, marginX, y);
       doc.setDrawColor(232,163,61); doc.line(marginX, y+2, pageW-marginX, y+2);
@@ -1793,24 +1809,46 @@ function renderExport(root){
 
       if(state.includeNotes){
         const notes = store.notes.filter(n=>n.subject===subject);
-        notes.forEach(n=>{
+        for(const n of notes){
           ensure(14);
           doc.setFontSize(10.5); doc.setFont('NanumGothic','bold'); doc.text(n.unit, marginX, y);
           doc.setFont('NanumGothic','normal');
           y+=6;
+
+          if(state.notesMode==='full' && n.images && n.images.length){
+            try{
+              const dims = await loadImageDims(n.images[0]);
+              const maxW = pageW-marginX*2, maxH = 78;
+              let dispW = maxW, dispH = dispW*(dims.h/dims.w);
+              if(dispH > maxH){ dispH = maxH; dispW = dispH*(dims.w/dims.h); }
+              ensure(dispH+6);
+              doc.addImage(n.images[0], imageFormatOf(n.images[0]), marginX, y, dispW, dispH);
+              y += dispH+6;
+            }catch(err){ /* 이미지 로드 실패 시 건너뜀 */ }
+          }
+
+          if(state.notesMode==='full' && n.answer){
+            ensure(6);
+            doc.setFontSize(9.5); doc.setTextColor(62,107,158);
+            doc.text(`정답: ${n.answer}`, marginX, y);
+            doc.setTextColor(30,30,30);
+            y += 6;
+          }
+
+          if(state.notesMode==='full'){
+            ensure(6);
+            const wr = doc.splitTextToSize(`오답사유: ${n.wrongReason}`, pageW-marginX*2);
+            doc.setFontSize(9); doc.text(wr, marginX, y); y += wr.length*4.6+4;
+          }
+
           doc.setFontSize(9);
           const cc = doc.splitTextToSize(`정확한 개념: ${n.correctConcept}`, pageW-marginX*2-6);
           const boxH = cc.length*4.6+5;
           ensure(boxH+6);
           doc.setFillColor(251,240,220); doc.rect(marginX, y-3.5, pageW-marginX*2, boxH, 'F');
           doc.text(cc, marginX+3, y+1);
-          y += boxH+6;
-          if(state.notesMode==='full'){
-            ensure(6);
-            const wr = doc.splitTextToSize(`오답사유: ${n.wrongReason}`, pageW-marginX*2);
-            doc.setFontSize(9); doc.text(wr, marginX, y); y += wr.length*4.6+4;
-          }
-        });
+          y += boxH+8;
+        }
       }
       if(state.includeMindmap && store.mindmaps[subject]){
         ensure(8); doc.setFontSize(10); doc.setTextColor(62,107,158); doc.text('마인드맵 개요', marginX, y); doc.setTextColor(30,30,30); y+=7;
@@ -1824,7 +1862,7 @@ function renderExport(root){
           chunks.forEach(c=>{ const lines = doc.splitTextToSize('· '+c.text, pageW-marginX*2); ensure(lines.length*4.6+2); doc.setFontSize(9); doc.text(lines, marginX, y); y+=lines.length*4.6+2; });
         }
       }
-    });
+    }
     doc.save('학습자료_2026-08-08.pdf');
     genBtn.disabled = false; genBtn.textContent = originalLabel;
   });
