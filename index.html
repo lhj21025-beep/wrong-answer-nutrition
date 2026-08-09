@@ -1317,7 +1317,12 @@ function renderMindmap(root){
     node.children.forEach((c,i)=> ensurePosition(c, node, i));
   }
 
-  function addChildTo(parentNode){
+  function liveRoot(){ return store.mindmaps[currentSubject]; }
+
+  function addChildTo(parentId){
+    const pRoot = liveRoot();
+    const parentNode = findNode(pRoot, parentId);
+    if(!parentNode) return;
     const id = 'n'+Date.now();
     const idx = parentNode.children.length;
     const angle = (idx*55 + 20) % 360, rad = angle*Math.PI/180, dist=200;
@@ -1327,9 +1332,10 @@ function renderMindmap(root){
     draw();
     startInlineEdit(id);
   }
-  function deleteNode(root2, id){
+  function deleteNode(id){
     if(!confirm('이 키워드와 하위 항목을 삭제할까요?')) return;
-    const p = findParent(root2, id);
+    const r = liveRoot();
+    const p = findParent(r, id);
     if(p) p.children = p.children.filter(c=>c.id!==id);
     if(mmSelectedId[currentSubject]===id) mmSelectedId[currentSubject] = null;
     draw();
@@ -1345,7 +1351,7 @@ function renderMindmap(root){
     const panel = wrap.querySelector('#mmPanel');
     const canvasWrap = wrap.querySelector('#mmCanvas');
     if(!currentSubject){ canvasWrap.innerHTML=''; panel.innerHTML='<div style="color:rgba(var(--text-muted-rgb),0.35);font-size:12.5px;">마인드맵을 추가해보세요</div>'; return; }
-    const root2 = store.mindmaps[currentSubject];
+    const root2 = liveRoot();
     ensurePosition(root2, null, 0);
 
     const flatAll = []; (function collect(n){ flatAll.push(n); n.children.forEach(collect); })(root2);
@@ -1390,7 +1396,7 @@ function renderMindmap(root){
     }
     drawEdges(root2);
 
-    function updateEdgesFor(){ svg.innerHTML=''; drawEdges(root2); }
+    function updateEdgesFor(){ svg.innerHTML=''; drawEdges(liveRoot()); }
 
     flatAll.forEach(n=>{
       const el = document.createElement('div');
@@ -1411,12 +1417,13 @@ function renderMindmap(root){
       }
       canvasWrap.appendChild(el);
 
+      const nodeId = n.id;
       if(editingId !== n.id){
         const addBtn = document.createElement('button');
         addBtn.textContent = '＋';
         addBtn.title = '자식 키워드 추가';
         addBtn.style.cssText = `position:absolute;left:${sx+W-9}px;top:${sy+H-9}px;width:19px;height:19px;border-radius:50%;border:none;background:var(--blue);color:#fff;font-size:12px;cursor:pointer;line-height:19px;padding:0;`;
-        addBtn.addEventListener('click', (e)=>{ e.stopPropagation(); addChildTo(n); });
+        addBtn.addEventListener('click', (e)=>{ e.stopPropagation(); addChildTo(nodeId); });
         canvasWrap.appendChild(addBtn);
 
         if(n.id !== 'root'){
@@ -1424,7 +1431,7 @@ function renderMindmap(root){
           delBtn.textContent = '×';
           delBtn.title = '삭제';
           delBtn.style.cssText = `position:absolute;left:${sx+W-9}px;top:${sy-9}px;width:18px;height:18px;border-radius:50%;border:none;background:var(--danger);color:#fff;font-size:11px;cursor:pointer;line-height:18px;padding:0;`;
-          delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); deleteNode(root2, n.id); });
+          delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); deleteNode(nodeId); });
           canvasWrap.appendChild(delBtn);
         }
       }
@@ -1442,8 +1449,9 @@ function renderMindmap(root){
         if(!dragging) return;
         const dx = e.clientX-sxStart, dy = e.clientY-syStart;
         if(Math.abs(dx)>3 || Math.abs(dy)>3) dragMoved = true;
-        n.x = oxStart+dx; n.y = oyStart+dy;
-        el.style.left = (n.x+offX)+'px'; el.style.top = (n.y+offY)+'px';
+        const liveNode = findNode(liveRoot(), nodeId) || n;
+        liveNode.x = oxStart+dx; liveNode.y = oyStart+dy;
+        el.style.left = (liveNode.x+offX)+'px'; el.style.top = (liveNode.y+offY)+'px';
         updateEdgesFor();
       });
       ['pointerup','pointercancel'].forEach(evt=>{
@@ -1459,8 +1467,10 @@ function renderMindmap(root){
     const inlineInput = canvasWrap.querySelector('#inlineEdit');
     if(inlineInput){
       inlineInput.focus(); inlineInput.select();
+      const editingNodeId = editingId;
       const commit = ()=>{
-        const node = findNode(root2, editingId);
+        const r = liveRoot();
+        const node = r ? findNode(r, editingNodeId) : null;
         if(node) node.label = inlineInput.value.trim() || '새 키워드';
         editingId = null;
         draw();
@@ -1484,15 +1494,22 @@ function renderMindmap(root){
       </div>
     `;
     panel.querySelector('#mmLabel').addEventListener('input', e=>{
-      selNode.label = e.target.value || '새 키워드';
-      const nodeEl = canvasWrap.querySelector(`[data-node-id="${selNode.id}"]`);
-      if(nodeEl) nodeEl.textContent = selNode.label;
+      const r = liveRoot();
+      const node = findNode(r, selId);
+      if(!node) return;
+      node.label = e.target.value || '새 키워드';
+      const nodeEl = canvasWrap.querySelector(`[data-node-id="${selId}"]`);
+      if(nodeEl) nodeEl.textContent = node.label;
     });
     panel.querySelector('#mmLabel').addEventListener('blur', ()=> draw());
-    panel.querySelector('#mmDetail').addEventListener('input', e=>{ selNode.detail = e.target.value; });
-    panel.querySelector('#mmAdd').addEventListener('click', ()=> addChildTo(selNode));
+    panel.querySelector('#mmDetail').addEventListener('input', e=>{
+      const r = liveRoot();
+      const node = findNode(r, selId);
+      if(node) node.detail = e.target.value;
+    });
+    panel.querySelector('#mmAdd').addEventListener('click', ()=> addChildTo(selId));
     const delBtn2 = panel.querySelector('#mmDel');
-    if(delBtn2) delBtn2.addEventListener('click', ()=> deleteNode(root2, selNode.id));
+    if(delBtn2) delBtn2.addEventListener('click', ()=> deleteNode(selId));
   }
   draw();
 }
@@ -1621,6 +1638,33 @@ function renderStats(root){
   root.appendChild(wrap);
 }
 
+/* ---------- jsPDF 한글 폰트 (나눔고딕) 캐시 로더 ---------- */
+let _koreanFontBase64 = null, _koreanFontBoldBase64 = null;
+function arrayBufferToBase64(buf){
+  let binary = '';
+  const bytes = new Uint8Array(buf);
+  const chunk = 0x8000;
+  for(let i=0; i<bytes.length; i+=chunk){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+  }
+  return btoa(binary);
+}
+async function ensureKoreanFont(doc){
+  if(!_koreanFontBase64){
+    const res = await fetch('https://cdn.jsdelivr.net/font-nanum/1.0/nanumgothic/v3/NanumGothic-Regular.ttf');
+    _koreanFontBase64 = arrayBufferToBase64(await res.arrayBuffer());
+  }
+  if(!_koreanFontBoldBase64){
+    const res2 = await fetch('https://cdn.jsdelivr.net/font-nanum/1.0/nanumgothic/v3/NanumGothic-Bold.ttf');
+    _koreanFontBoldBase64 = arrayBufferToBase64(await res2.arrayBuffer());
+  }
+  doc.addFileToVFS('NanumGothic-Regular.ttf', _koreanFontBase64);
+  doc.addFont('NanumGothic-Regular.ttf', 'NanumGothic', 'normal');
+  doc.addFileToVFS('NanumGothic-Bold.ttf', _koreanFontBoldBase64);
+  doc.addFont('NanumGothic-Bold.ttf', 'NanumGothic', 'bold');
+  doc.setFont('NanumGothic', 'normal');
+}
+
 function renderExport(root){
   const wrap = document.createElement('div');
   wrap.className = 'pad';
@@ -1708,7 +1752,7 @@ function renderExport(root){
 
   function outline(node,depth){ let l=[{text:node.label,depth}]; node.children.forEach(c=>l=l.concat(outline(c,depth+1))); return l; }
 
-  wrap.querySelector('#exGenBtn').addEventListener('click', ()=>{
+  wrap.querySelector('#exGenBtn').addEventListener('click', async ()=>{
     const subjectPool = state.subjects.size ? [...state.subjects] : SUBJECTS;
     const subjects = subjectPool.filter(s=>{
       const hasN = state.includeNotes && store.notes.some(n=>n.subject===s);
@@ -1717,10 +1761,21 @@ function renderExport(root){
       return hasN||hasM||hasC;
     });
     if(subjects.length===0){ alert('포함할 콘텐츠와 과목을 선택해주세요.'); return; }
+    const genBtn = wrap.querySelector('#exGenBtn');
+    const originalLabel = genBtn.textContent;
+    genBtn.disabled = true; genBtn.textContent = '한글 폰트 불러오는 중...';
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({unit:'mm',format:'a4'});
+    try{
+      await ensureKoreanFont(doc);
+    }catch(err){
+      alert('한글 폰트를 불러오지 못했어요. 인터넷 연결을 확인하고 다시 시도해주세요.');
+      genBtn.disabled = false; genBtn.textContent = originalLabel;
+      return;
+    }
+    genBtn.textContent = 'PDF 생성 중...';
     const pageW=210, marginX=18; let y=100;
-    function newPage(){ doc.addPage(); y=22; }
+    function newPage(){ doc.addPage(); doc.setFont('NanumGothic','normal'); y=22; }
     function ensure(h){ if(y+h>275) newPage(); }
 
     doc.setFontSize(20); doc.text('학습 자료 모음', pageW/2, y, {align:'center'});
@@ -1740,8 +1795,8 @@ function renderExport(root){
         const notes = store.notes.filter(n=>n.subject===subject);
         notes.forEach(n=>{
           ensure(14);
-          doc.setFontSize(10.5); doc.setFont(undefined,'bold'); doc.text(n.unit, marginX, y);
-          doc.setFont(undefined,'normal');
+          doc.setFontSize(10.5); doc.setFont('NanumGothic','bold'); doc.text(n.unit, marginX, y);
+          doc.setFont('NanumGothic','normal');
           y+=6;
           doc.setFontSize(9);
           const cc = doc.splitTextToSize(`정확한 개념: ${n.correctConcept}`, pageW-marginX*2-6);
@@ -1771,6 +1826,7 @@ function renderExport(root){
       }
     });
     doc.save('학습자료_2026-08-08.pdf');
+    genBtn.disabled = false; genBtn.textContent = originalLabel;
   });
 }
 
