@@ -106,6 +106,9 @@
   <span class="app-title" id="topTitle">홈</span>
   <span class="sub" id="topSub">영양교사 임용시험 학습 앱</span>
   <button id="themeToggle" style="background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;flex-shrink:0;margin-left:auto;">🌙</button>
+  <button id="refreshTopBtn" title="최신 데이터 새로고침" style="display:none;background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:13px;flex-shrink:0;">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+  </button>
   <button id="logoutTopBtn" title="로그아웃" style="display:none;background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:13px;flex-shrink:0;">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
   </button>
@@ -229,7 +232,7 @@ function emptyStore(){
   return { examDate:'2026-11-08', showDday:true, notes:[], mindmaps:{}, chunks:[], collections:[], nextNoteId:1, nextChunkId:1, nextCollectionId:1 };
 }
 
-/* ---------- 반응형 store: 어디서든 값을 바꾸면 자동으로 Firestore에 저장(디바운스) ---------- */
+/* ---------- 반응형 store: 바뀐 부분(meta/notes/mindmaps/chunks)만 추적해서 저장 ---------- */
 function makeReactive(obj, onChange){
   if(typeof obj !== 'object' || obj === null) return obj;
   for(const key in obj){ obj[key] = makeReactive(obj[key], onChange); }
@@ -238,23 +241,40 @@ function makeReactive(obj, onChange){
     deleteProperty(target, prop){ delete target[prop]; onChange(); return true; },
   });
 }
+const dirty = { meta:false, notes:false, mindmaps:false, chunks:false };
+function bucketFor(prop){
+  if(prop==='notes' || prop==='mindmaps' || prop==='chunks') return prop;
+  return 'meta'; // examDate, showDday, nextNoteId, nextChunkId, nextCollectionId, collections
+}
+function markDirty(key){ dirty[key] = true; persistAll(); }
+function makeReactiveTop(obj){
+  for(const key in obj){ obj[key] = makeReactive(obj[key], ()=> markDirty(bucketFor(key))); }
+  return new Proxy(obj, {
+    set(target, prop, value){
+      target[prop] = makeReactive(value, ()=> markDirty(bucketFor(prop)));
+      markDirty(bucketFor(prop));
+      return true;
+    },
+    deleteProperty(target, prop){ delete target[prop]; markDirty(bucketFor(prop)); return true; },
+  });
+}
 let persistTimer = null;
-let lastLocalMutationAt = 0;
 function persistAll(){
-  if(suppressPersist) return; // 원격(내 것 포함) 변경 적용 중 — 로컬 편집으로 기록하지 않음
-  lastLocalMutationAt = Date.now();
   if(!FIREBASE_ENABLED || !currentUser) return;
   clearTimeout(persistTimer);
   persistTimer = setTimeout(()=>{
     const ref = db.collection('users').doc(currentUser.uid).collection('data');
-    ref.doc('meta').set({ examDate: store.examDate, showDday: store.showDday, nextNoteId: store.nextNoteId, nextChunkId: store.nextChunkId, nextCollectionId: store.nextCollectionId, collections: store.collections });
-    ref.doc('notes').set({ items: store.notes });
-    ref.doc('mindmaps').set({ items: store.mindmaps });
-    ref.doc('chunks').set({ items: store.chunks });
+    if(dirty.meta){
+      ref.doc('meta').set({ examDate: store.examDate, showDday: store.showDday, nextNoteId: store.nextNoteId, nextChunkId: store.nextChunkId, nextCollectionId: store.nextCollectionId, collections: store.collections });
+      dirty.meta = false;
+    }
+    if(dirty.notes){ ref.doc('notes').set({ items: store.notes }); dirty.notes = false; }
+    if(dirty.mindmaps){ ref.doc('mindmaps').set({ items: store.mindmaps }); dirty.mindmaps = false; }
+    if(dirty.chunks){ ref.doc('chunks').set({ items: store.chunks }); dirty.chunks = false; }
   }, 600);
 }
 
-let store = FIREBASE_ENABLED ? makeReactive(emptyStore(), persistAll) : makeReactive(DEMO_SEED_STORE, persistAll);
+let store = FIREBASE_ENABLED ? makeReactiveTop(emptyStore()) : makeReactiveTop(DEMO_SEED_STORE);
 
 const REVIEW_INTERVALS = [1, 3, 7, 16]; // days, indexed by masteryLevel 0~3
 function addDays(dateStr, days){
@@ -1743,7 +1763,7 @@ function renderExport(root){
         const parsed = JSON.parse(ev.target.result);
         if(!parsed.notes || !parsed.mindmaps || !parsed.chunks){ throw new Error('형식이 올바르지 않습니다'); }
         if(!confirm('현재 데이터를 백업 파일 내용으로 교체합니다. 계속할까요?')) return;
-        store = makeReactive(parsed, persistAll);
+        store = makeReactiveTop(parsed);
         showToast('백업을 불러왔습니다');
         switchTab('home');
       }catch(err){
@@ -1871,65 +1891,49 @@ function renderExport(root){
 /* ============================== INIT / AUTH ============================== */
 const loginGate = document.getElementById('loginGate');
 const appShell = document.querySelector('.topbar');
-let unsubscribeFns = [];
-let suppressPersist = false;
 
 function isEditingNow(){
-  // 오답노트 작성 중이거나 모달이 열려있을 땐 원격 변경사항으로 인한 전체 재렌더를 잠시 미룸 (입력 중 포커스 보호)
   if(currentTab==='notes' && notesSubview==='capture') return true;
-  if(document.querySelector('.modal-backdrop-guard')) return true;
   const ae = document.activeElement;
   if(ae && (ae.tagName==='TEXTAREA' || ae.tagName==='INPUT')) return true;
   return false;
 }
-function maybeRender(){
-  if(isEditingNow()) return;
-  render();
+
+async function loadStoreFromFirestore(uid){
+  const ref = db.collection('users').doc(uid).collection('data');
+  const [metaSnap, notesSnap, mapsSnap, chunksSnap] = await Promise.all([
+    ref.doc('meta').get(), ref.doc('notes').get(), ref.doc('mindmaps').get(), ref.doc('chunks').get(),
+  ]);
+  const fresh = emptyStore();
+  if(metaSnap.exists){
+    const m = metaSnap.data();
+    fresh.examDate = m.examDate || fresh.examDate;
+    fresh.showDday = (m.showDday !== undefined) ? m.showDday : fresh.showDday;
+    fresh.nextNoteId = m.nextNoteId || 1;
+    fresh.nextChunkId = m.nextChunkId || 1;
+    fresh.nextCollectionId = m.nextCollectionId || 1;
+    fresh.collections = m.collections || [];
+  }
+  if(notesSnap.exists) fresh.notes = notesSnap.data().items || [];
+  if(mapsSnap.exists) fresh.mindmaps = mapsSnap.data().items || {};
+  if(chunksSnap.exists) fresh.chunks = chunksSnap.data().items || [];
+  return fresh;
 }
 
-function attachRealtimeListeners(uid){
-  const ref = db.collection('users').doc(uid).collection('data');
-  const RECENT_MS = 2500;
-  function maybeRenderFromRemote(){
-    if(Date.now() - lastLocalMutationAt > RECENT_MS) maybeRender();
+async function manualRefresh(){
+  if(!currentUser) return;
+  if(isEditingNow() && !confirm('지금 작성 중인 내용이 있을 수 있어요. 새로고침하면 저장 안 된 내용이 사라질 수 있습니다. 계속할까요?')) return;
+  const btn = document.getElementById('refreshTopBtn');
+  if(btn) btn.style.opacity = '0.5';
+  try{
+    const loaded = await loadStoreFromFirestore(currentUser.uid);
+    store = makeReactiveTop(loaded);
+    showToast('최신 데이터를 불러왔습니다');
+    render();
+  }catch(err){
+    alert('새로고침에 실패했어요. 인터넷 연결을 확인해주세요.');
   }
-  const un1 = ref.doc('meta').onSnapshot(snap=>{
-    suppressPersist = true;
-    if(snap.exists){
-      const m = snap.data();
-      store.examDate = m.examDate || store.examDate;
-      store.showDday = (m.showDday !== undefined) ? m.showDday : store.showDday;
-      store.nextNoteId = m.nextNoteId || store.nextNoteId;
-      store.nextChunkId = m.nextChunkId || store.nextChunkId;
-      store.nextCollectionId = m.nextCollectionId || store.nextCollectionId;
-      store.collections = m.collections || [];
-    }
-    suppressPersist = false;
-    maybeRenderFromRemote();
-  });
-  const un2 = ref.doc('notes').onSnapshot(snap=>{
-    suppressPersist = true;
-    store.notes = snap.exists ? (snap.data().items || []) : [];
-    suppressPersist = false;
-    maybeRenderFromRemote();
-  });
-  const un3 = ref.doc('mindmaps').onSnapshot(snap=>{
-    suppressPersist = true;
-    store.mindmaps = snap.exists ? (snap.data().items || {}) : {};
-    suppressPersist = false;
-    maybeRenderFromRemote();
-  });
-  const un4 = ref.doc('chunks').onSnapshot(snap=>{
-    suppressPersist = true;
-    store.chunks = snap.exists ? (snap.data().items || []) : [];
-    suppressPersist = false;
-    maybeRenderFromRemote();
-  });
-  unsubscribeFns = [un1, un2, un3, un4];
-}
-function detachRealtimeListeners(){
-  unsubscribeFns.forEach(fn=> fn());
-  unsubscribeFns = [];
+  if(btn) btn.style.opacity = '1';
 }
 
 function showLoginGate(show){
@@ -1957,19 +1961,22 @@ if(FIREBASE_ENABLED){
   document.getElementById('logoutTopBtn').addEventListener('click', ()=>{
     if(confirm('로그아웃할까요?')) auth.signOut();
   });
-  auth.onAuthStateChanged((user)=>{
+  document.getElementById('refreshTopBtn').addEventListener('click', manualRefresh);
+  auth.onAuthStateChanged(async (user)=>{
     const logoutTopBtn = document.getElementById('logoutTopBtn');
+    const refreshTopBtn = document.getElementById('refreshTopBtn');
     if(user){
       currentUser = user;
-      store = makeReactive(emptyStore(), persistAll);
+      const loaded = await loadStoreFromFirestore(user.uid);
+      store = makeReactiveTop(loaded);
       showLoginGate(false);
       logoutTopBtn.style.display = '';
+      refreshTopBtn.style.display = '';
       switchTab('home');
-      attachRealtimeListeners(user.uid);
     } else {
       currentUser = null;
-      detachRealtimeListeners();
       logoutTopBtn.style.display = 'none';
+      refreshTopBtn.style.display = 'none';
       showLoginGate(true);
     }
   });
