@@ -29,13 +29,13 @@
   html,body{margin:0;padding:0;height:100%;overscroll-behavior:none;}
   body{
     font-family:'Noto Sans KR',sans-serif;background:var(--desk);color:var(--paper);
-    display:flex;flex-direction:column;height:100vh;overflow:hidden;transition:background .15s,color .15s;
+    display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;transition:background .15s,color .15s;
   }
   ::-webkit-scrollbar{width:8px;height:8px;}
   ::-webkit-scrollbar-thumb{background:rgba(var(--border-rgb),0.12);border-radius:4px;}
 
   .topbar{
-    display:flex;align-items:center;gap:12px;padding:14px 20px;flex-shrink:0;
+    display:flex;align-items:center;gap:12px;padding:calc(14px + env(safe-area-inset-top)) 20px 14px;flex-shrink:0;
     border-bottom:1px solid rgba(var(--border-rgb),0.06);
   }
   .topbar .app-title{font-size:16px;font-weight:700;}
@@ -610,7 +610,7 @@ function renderNotesList(root){
     <div style="display:flex;gap:8px;margin-bottom:10px;">
       <div style="flex:1;display:flex;align-items:center;gap:8px;background:var(--desk-2);border:1px solid rgba(var(--border-rgb),0.08);border-radius:999px;padding:9px 14px;">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(var(--text-muted-rgb),0.4)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input id="searchIn" placeholder="검색" style="flex:1;background:none;border:none;outline:none;color:var(--paper);font-size:13px;">
+        <input id="searchIn" lang="ko" placeholder="검색" style="flex:1;background:none;border:none;outline:none;color:var(--paper);font-size:13px;">
       </div>
       <button class="btn ghost" id="conceptModeBtn">개념만★</button>
     </div>
@@ -845,14 +845,14 @@ function renderNotesCapture(root){
     <div class="row">
       <div class="field">
         <label>정답</label>
-        <input id="cAnswer" placeholder="예: ③, 또는 직접 입력">
+        <input id="cAnswer" lang="ko" placeholder="예: ③, 또는 직접 입력">
         <div id="cAnswerHint" style="display:none;font-size:10.5px;color:var(--amber-soft);margin-top:2px;">⚠ 여백 필기에서 자동 인식된 값이에요 — 꼭 확인해주세요</div>
       </div>
       <div class="field"></div>
     </div>
     <div class="row">
-      <div class="field"><label>오답 사유</label><textarea id="cWrongReason" placeholder="왜 틀렸는지"></textarea></div>
-      <div class="field"><label>정확한 개념 ★</label><textarea id="cConcept" placeholder="정확한 개념 정리"></textarea></div>
+      <div class="field"><label>오답 사유</label><textarea id="cWrongReason" lang="ko" placeholder="왜 틀렸는지"></textarea></div>
+      <div class="field"><label>정확한 개념 ★</label><textarea id="cConcept" lang="ko" placeholder="정확한 개념 정리"></textarea></div>
     </div>
     <button class="btn primary" id="cSaveBtn" style="margin-top:12px;width:100%;">오답노트 저장</button>
   `;
@@ -1283,7 +1283,7 @@ function renderMindmap(root){
   const wrap = document.createElement('div');
   wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;min-height:0;';
   wrap.innerHTML = `<div class="row" style="padding:14px 20px 6px;gap:6px;flex-shrink:0;" id="mmTabs"></div>
-    <div style="padding:0 20px 6px;font-size:11px;color:rgba(var(--text-muted-rgb),0.4);flex-shrink:0;">💡 노드의 ＋로 키워드 추가, 노드를 드래그해서 자유롭게 배치할 수 있어요</div>
+    <div style="padding:0 20px 6px;font-size:11px;color:rgba(var(--text-muted-rgb),0.4);flex-shrink:0;">💡 ＋버튼 또는 노드 가장자리에서 선을 그어 키워드 추가 · 노드 중앙을 드래그하면 이동</div>
     <div style="display:flex;gap:12px;padding:8px 20px 20px;flex:1;min-height:320px;">
       <div id="mmCanvasShell" style="flex:2;min-width:280px;background:var(--desk-2);border-radius:14px;overflow:auto;position:relative;">
         <div id="mmCanvas" style="position:relative;"></div>
@@ -1339,14 +1339,20 @@ function renderMindmap(root){
 
   function liveRoot(){ return store.mindmaps[currentSubject]; }
 
-  function addChildTo(parentId){
+  function addChildTo(parentId, pos){
     const pRoot = liveRoot();
     const parentNode = findNode(pRoot, parentId);
     if(!parentNode) return;
     const id = 'n'+Date.now();
-    const idx = parentNode.children.length;
-    const angle = (idx*55 + 20) % 360, rad = angle*Math.PI/180, dist=200;
-    const newNode = {id, label:'', detail:'', children:[], x:parentNode.x+Math.cos(rad)*dist, y:parentNode.y+Math.sin(rad)*dist};
+    let nx, ny;
+    if(pos){
+      nx = pos.x - W/2; ny = pos.y - H/2;
+    } else {
+      const idx = parentNode.children.length;
+      const angle = (idx*55 + 20) % 360, rad = angle*Math.PI/180, dist=200;
+      nx = parentNode.x+Math.cos(rad)*dist; ny = parentNode.y+Math.sin(rad)*dist;
+    }
+    const newNode = {id, label:'', detail:'', children:[], x:nx, y:ny};
     parentNode.children.push(newNode);
     mmSelectedId[currentSubject] = id;
     draw();
@@ -1427,7 +1433,7 @@ function renderMindmap(root){
 
       if(editingId === n.id){
         el.style.overflow = 'visible';
-        el.innerHTML = `<input id="inlineEdit" value="${(n.label||'').replace(/"/g,'&quot;')}" placeholder="키워드 입력" style="width:100%;height:100%;background:var(--desk-2);border:1.5px solid var(--blue);border-radius:8px;color:var(--paper);font-size:12px;text-align:center;padding:0 6px;box-sizing:border-box;">`;
+        el.innerHTML = `<input id="inlineEdit" lang="ko" value="${(n.label||'').replace(/"/g,'&quot;')}" placeholder="키워드 입력" style="width:100%;height:100%;background:var(--desk-2);border:1.5px solid var(--blue);border-radius:8px;color:var(--paper);font-size:12px;text-align:center;padding:0 6px;box-sizing:border-box;touch-action:manipulation;-webkit-user-select:text;user-select:text;">`;
       } else {
         el.textContent = n.label || '(입력 필요)';
         el.addEventListener('click', (e)=>{
@@ -1456,16 +1462,41 @@ function renderMindmap(root){
         }
       }
 
-      // ---------- 드래그 ----------
-      let dragging=false, sxStart=0, syStart=0, oxStart=0, oyStart=0;
+      // ---------- 드래그 (중앙=이동, 가장자리=펜으로 선 그어서 자녀 만들기) ----------
+      let dragging=false, spawning=false, sxStart=0, syStart=0, oxStart=0, oyStart=0;
+      let spawnLine = null;
+      const EDGE = 14;
       el.addEventListener('pointerdown', (e)=>{
         if(editingId === n.id) return;
-        dragging = true; dragMoved = false;
-        el.style.cursor = 'grabbing';
+        const rect = el.getBoundingClientRect();
+        const lx = e.clientX-rect.left, ly = e.clientY-rect.top;
+        const nearEdge = lx<EDGE || ly<EDGE || (rect.width-lx)<EDGE || (rect.height-ly)<EDGE;
         el.setPointerCapture(e.pointerId);
-        sxStart=e.clientX; syStart=e.clientY; oxStart=n.x; oyStart=n.y;
+        if(nearEdge){
+          spawning = true; dragMoved = false;
+          sxStart=e.clientX; syStart=e.clientY;
+          spawnLine = document.createElementNS('http://www.w3.org/2000/svg','line');
+          spawnLine.setAttribute('stroke','var(--blue)'); spawnLine.setAttribute('stroke-width','2.5'); spawnLine.setAttribute('stroke-dasharray','5,4');
+          const startX = n.x+offX+W/2, startY = n.y+offY+H/2;
+          spawnLine.setAttribute('x1', startX); spawnLine.setAttribute('y1', startY);
+          spawnLine.setAttribute('x2', startX); spawnLine.setAttribute('y2', startY);
+          svg.appendChild(spawnLine);
+        } else {
+          dragging = true; dragMoved = false;
+          el.style.cursor = 'grabbing';
+          sxStart=e.clientX; syStart=e.clientY; oxStart=n.x; oyStart=n.y;
+        }
       });
       el.addEventListener('pointermove', (e)=>{
+        if(spawning){
+          const dx = e.clientX-sxStart, dy = e.clientY-syStart;
+          if(Math.abs(dx)>3 || Math.abs(dy)>3) dragMoved = true;
+          const shell = wrap.querySelector('#mmCanvasShell');
+          const shellRect = shell.getBoundingClientRect();
+          const localX = e.clientX-shellRect.left+shell.scrollLeft, localY = e.clientY-shellRect.top+shell.scrollTop;
+          if(spawnLine){ spawnLine.setAttribute('x2', localX); spawnLine.setAttribute('y2', localY); }
+          return;
+        }
         if(!dragging) return;
         const dx = e.clientX-sxStart, dy = e.clientY-syStart;
         if(Math.abs(dx)>3 || Math.abs(dy)>3) dragMoved = true;
@@ -1475,7 +1506,16 @@ function renderMindmap(root){
         updateEdgesFor();
       });
       ['pointerup','pointercancel'].forEach(evt=>{
-        el.addEventListener(evt, ()=>{
+        el.addEventListener(evt, (e)=>{
+          if(spawning){
+            spawning = false;
+            const endX = parseFloat(spawnLine?.getAttribute('x2')||0), endY = parseFloat(spawnLine?.getAttribute('y2')||0);
+            if(spawnLine) spawnLine.remove();
+            if(dragMoved){
+              addChildTo(nodeId, {x: endX-offX, y: endY-offY});
+            }
+            return;
+          }
           if(!dragging) return;
           dragging = false; el.style.cursor='grab';
           if(dragMoved) draw();
@@ -1486,7 +1526,8 @@ function renderMindmap(root){
 
     const inlineInput = canvasWrap.querySelector('#inlineEdit');
     if(inlineInput){
-      inlineInput.focus(); inlineInput.select();
+      requestAnimationFrame(()=>{ inlineInput.focus(); inlineInput.select(); });
+      inlineInput.addEventListener('pointerdown', e=> e.stopPropagation());
       const editingNodeId = editingId;
       const commit = ()=>{
         const r = liveRoot();
@@ -1506,8 +1547,8 @@ function renderMindmap(root){
       return;
     }
     panel.innerHTML = `
-      <div class="field" style="margin-bottom:10px;"><label>키워드</label><input id="mmLabel" value="${selNode.label.replace(/"/g,'&quot;')}"></div>
-      <div class="field" style="margin-bottom:10px;"><label>상세 개념</label><textarea id="mmDetail" style="min-height:100px;">${selNode.detail||''}</textarea></div>
+      <div class="field" style="margin-bottom:10px;"><label>키워드</label><input id="mmLabel" lang="ko" value="${selNode.label.replace(/"/g,'&quot;')}"></div>
+      <div class="field" style="margin-bottom:10px;"><label>상세 개념</label><textarea id="mmDetail" lang="ko" style="min-height:100px;">${selNode.detail||''}</textarea></div>
       <div style="display:flex;gap:8px;">
         <button class="btn blue" id="mmAdd" style="flex:1;">＋ 자식추가</button>
         ${selNode.id!=='root' ? '<button class="btn danger" id="mmDel">삭제</button>' : ''}
@@ -1562,7 +1603,7 @@ function renderChunk(root){
       el.style.cssText = `position:absolute;left:${chunk.x}px;top:${chunk.y}px;width:150px;min-height:100px;background:${c.bg};color:${c.text};border-radius:4px;padding:10px;box-shadow:0 5px 12px rgba(0,0,0,0.3);cursor:grab;transform:rotate(${((chunk.id*37)%7)-3}deg);touch-action:none;`;
       el.innerHTML = `
         <div style="font-size:9.5px;font-weight:700;background:rgba(0,0,0,0.12);display:inline-block;padding:2px 7px;border-radius:999px;margin-bottom:6px;">${chunk.subject}</div>
-        <textarea style="width:100%;border:none;background:none;resize:none;outline:none;font-family:'Noto Sans KR',sans-serif;font-size:11.5px;color:inherit;min-height:50px;">${chunk.text}</textarea>
+        <textarea lang="ko" style="width:100%;border:none;background:none;resize:none;outline:none;font-family:'Noto Sans KR',sans-serif;font-size:11.5px;color:inherit;min-height:50px;">${chunk.text}</textarea>
         <button class="del" style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;border:none;background:rgba(0,0,0,0.15);color:inherit;font-size:10px;cursor:pointer;">×</button>
       `;
       el.querySelector('textarea').addEventListener('input', e=> chunk.text = e.target.value);
