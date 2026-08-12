@@ -25,6 +25,9 @@
     --text-muted-rgb: 34,38,47;
     --border-rgb: 0,0,0;
   }
+  .content-text{ font-size:inherit; }
+  body.text-large .content-text{ font-size:1.22em !important; line-height:1.6 !important; }
+  body.text-large .content-title{ font-size:1.12em !important; }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;height:100%;overscroll-behavior:none;}
   body{
@@ -105,7 +108,8 @@
   <span class="tag">INTEGRATED</span>
   <span class="app-title" id="topTitle">홈</span>
   <span class="sub" id="topSub">영양교사 임용시험 학습 앱</span>
-  <button id="themeToggle" style="background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;flex-shrink:0;margin-left:auto;">🌙</button>
+  <button id="textSizeToggle" title="글자 크게 보기" style="background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:12px;font-weight:700;flex-shrink:0;margin-left:auto;">Aa</button>
+  <button id="themeToggle" style="background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;flex-shrink:0;">🌙</button>
   <button id="refreshTopBtn" title="최신 데이터 새로고침" style="display:none;background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:13px;flex-shrink:0;">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
   </button>
@@ -342,6 +346,11 @@ document.getElementById('themeToggle').addEventListener('click', ()=>{
   const isLight = document.body.classList.toggle('light');
   document.getElementById('themeToggle').textContent = isLight ? '☀️' : '🌙';
 });
+document.getElementById('textSizeToggle').addEventListener('click', (e)=>{
+  const isLarge = document.body.classList.toggle('text-large');
+  e.target.style.background = isLarge ? 'var(--amber)' : 'rgba(var(--border-rgb),0.08)';
+  e.target.style.color = isLarge ? '#241705' : 'var(--paper)';
+});
 
 
 
@@ -544,7 +553,7 @@ function openReviewSession(dueNotes){
       revealArea.innerHTML = `
         ${n.answer ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--blue-soft);">정답 ${n.answer}</div>` : ''}
         <div style="font-size:12px;margin-bottom:8px;"><b style="color:rgba(var(--text-muted-rgb),0.5);">오답사유</b><br>${n.wrongReason}</div>
-        <div style="font-size:12.5px;background:rgba(232,163,61,0.12);border-radius:10px;padding:11px 13px;"><b style="color:var(--amber-soft);">정확한 개념</b><br>${n.correctConcept}</div>
+        <div class="content-text" style="font-size:12.5px;background:rgba(232,163,61,0.12);border-radius:10px;padding:11px 13px;"><b style="color:var(--amber-soft);">정확한 개념</b><br>${n.correctConcept}</div>
       `;
       actionArea.innerHTML = `
         <div style="display:flex;gap:8px;">
@@ -669,7 +678,7 @@ function renderNotesList(root){
           <h3 style="font-size:12.5px;color:var(--amber-soft);font-family:'JetBrains Mono',monospace;margin:0 0 8px;">${s} <span style="color:rgba(var(--text-muted-rgb),0.35);font-weight:400;">${grouped[s].length}개</span></h3>
           ${grouped[s].map(n=>`<div style="background:var(--desk-2);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;padding:9px 12px;margin-bottom:7px;">
             <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:rgba(var(--text-muted-rgb),0.35);margin-bottom:3px;">${n.unit} · ${n.source}</div>
-            <p style="margin:0;font-size:12.5px;line-height:1.6;">${n.correctConcept}</p>
+            <p class="content-text" style="margin:0;font-size:12.5px;line-height:1.6;">${n.correctConcept}</p>
           </div>`).join('')}
         </div>`).join('');
       return;
@@ -685,7 +694,7 @@ function renderNotesList(root){
           </div>
           <div style="padding:10px 11px;">
             <div style="font-size:10px;font-weight:700;color:var(--amber-soft);margin-bottom:4px;">${n.subject} · ${n.mistakeType}</div>
-            <div style="font-size:11px;color:rgba(var(--text-muted-rgb),0.85);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${n.correctConcept}</div>
+            <div class="content-text" style="font-size:11px;color:rgba(var(--text-muted-rgb),0.85);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${n.correctConcept}</div>
           </div>
         </div>`;
       }).join('') + `</div>`;
@@ -718,10 +727,10 @@ function openNoteModal(note){
       </div>
       <div style="font-size:11px;color:rgba(var(--text-muted-rgb),0.4);margin-bottom:12px;">${note.subject} · ${note.mistakeType} · ${note.source}</div>
       ${note.images && note.images.length ? `<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;">${note.images.map(src=>`<img src="${src}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;">`).join('')}</div>` : ''}
-      <div style="font-size:12px;margin-bottom:10px;"><b style="color:rgba(var(--text-muted-rgb),0.5);">문제</b><br>${note.ocrText}</div>
+      <div class="content-text" style="font-size:12px;margin-bottom:10px;"><b style="color:rgba(var(--text-muted-rgb),0.5);">문제</b><br>${note.ocrText}</div>
       ${note.answer ? `<div style="font-size:12px;margin-bottom:10px;"><b style="color:rgba(var(--text-muted-rgb),0.5);">정답</b> ${note.answer}</div>` : ''}
-      <div style="font-size:12px;margin-bottom:10px;"><b style="color:rgba(var(--text-muted-rgb),0.5);">오답사유</b><br>${note.wrongReason}</div>
-      <div style="font-size:12px;background:rgba(232,163,61,0.1);border-radius:8px;padding:9px 11px;margin-bottom:14px;"><b style="color:var(--amber-soft);">정확한 개념</b><br>${note.correctConcept}</div>
+      <div class="content-text" style="font-size:12px;margin-bottom:10px;"><b style="color:rgba(var(--text-muted-rgb),0.5);">오답사유</b><br>${note.wrongReason}</div>
+      <div class="content-text" style="font-size:12px;background:rgba(232,163,61,0.1);border-radius:8px;padding:9px 11px;margin-bottom:14px;"><b style="color:var(--amber-soft);">정확한 개념</b><br>${note.correctConcept}</div>
       <div style="margin-bottom:14px;">
         <label style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.06em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;display:block;margin-bottom:6px;">컬렉션</label>
         <div id="collChipsWrap" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
@@ -814,11 +823,6 @@ function renderNotesCapture(root){
         <input type="range" id="sizeSlider" min="1" max="28" value="4" style="flex:1;accent-color:var(--amber);">
         <span id="sizeVal" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(var(--text-muted-rgb),0.6);width:22px;text-align:right;">4</span>
       </div>
-      <div style="display:flex;gap:6px;">
-        <button class="btn ghost" id="btnUndo" style="flex:1;">↶ 실행취소</button>
-        <button class="btn ghost" id="btnRedo" style="flex:1;">↷ 다시실행</button>
-        <button class="btn ghost" id="btnClearCanvas" style="flex:1;color:var(--danger);">전체삭제</button>
-      </div>
     </div>
 
     <div id="cCanvasShell" style="background:var(--desk-2);border-radius:12px;min-height:220px;display:flex;align-items:center;justify-content:center;position:relative;margin-bottom:8px;overflow:auto;padding:14px;">
@@ -827,8 +831,14 @@ function renderNotesCapture(root){
         <span style="font-size:11px;opacity:0.7;">이미지 옆에 여백이 자동으로 생겨서 정답을 바로 적을 수 있어요</span>
       </div>
       <div id="cStage" hidden style="position:relative;"></div>
+      <div id="cFloatingTools" style="display:none;position:absolute;top:10px;right:10px;z-index:5;flex-direction:column;gap:6px;">
+        <button id="btnUndo" title="실행취소" style="width:38px;height:38px;border-radius:50%;border:none;background:var(--desk);color:var(--paper);box-shadow:0 2px 8px rgba(0,0,0,0.35);font-size:16px;cursor:pointer;">↶</button>
+        <button id="btnRedo" title="다시실행" style="width:38px;height:38px;border-radius:50%;border:none;background:var(--desk);color:var(--paper);box-shadow:0 2px 8px rgba(0,0,0,0.35);font-size:16px;cursor:pointer;">↷</button>
+        <button id="btnClearCanvas" title="필기 전체삭제" style="width:38px;height:38px;border-radius:50%;border:none;background:var(--danger);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.35);font-size:13px;cursor:pointer;">✕</button>
+      </div>
     </div>
-    <div style="font-size:10.5px;color:rgba(var(--text-muted-rgb),0.35);margin-bottom:12px;">💡 오른쪽 여백에 정답을 적어두면, 분석 시 자동으로 정답란에 인식해서 채워드려요</div>
+    <div style="font-size:10.5px;color:rgba(var(--text-muted-rgb),0.35);margin-bottom:4px;">💡 오른쪽 여백에 정답을 적어두면, 분석 시 자동으로 정답란에 인식해서 채워드려요</div>
+    <div style="font-size:10.5px;color:rgba(var(--text-muted-rgb),0.35);margin-bottom:12px;">💡 손가락 두 개로 캔버스를 톡 치면 바로 전 동작이 취소돼요 (실행취소)</div>
 
     <button class="btn blue" id="cAnalyzeBtn" style="margin-bottom:12px;display:none;">이미지 분석하기(OCR)</button>
     <div id="cOcrResult" style="display:none;margin-bottom:12px;"></div>
@@ -845,7 +855,10 @@ function renderNotesCapture(root){
     <div class="row">
       <div class="field">
         <label>정답</label>
-        <input id="cAnswer" lang="ko" placeholder="예: ③, 또는 직접 입력">
+        <div style="position:relative;">
+          <input id="cAnswer" lang="ko" placeholder="예: ③, 또는 직접 입력" style="width:100%;padding-right:30px;box-sizing:border-box;">
+          <button id="cAnswerClear" title="전체 지우기" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;border:none;background:var(--danger);color:#fff;font-size:11px;line-height:18px;padding:0;cursor:pointer;">×</button>
+        </div>
         <div id="cAnswerHint" style="display:none;font-size:10.5px;color:var(--amber-soft);margin-top:2px;">⚠ 여백 필기에서 자동 인식된 값이에요 — 꼭 확인해주세요</div>
       </div>
       <div class="field"></div>
@@ -867,7 +880,8 @@ function renderNotesCapture(root){
     {k:'fountain', label:'만년필'},
     {k:'pencil', label:'연필'},
     {k:'highlighter', label:'형광펜'},
-    {k:'eraser', label:'지우개'},
+    {k:'eraser', label:'🧹지우개'},
+    {k:'eraser-stroke', label:'🧹지우개(선 통째로)'},
   ];
   const SHAPE_TYPES = [
     {k:'rect', label:'네모'},
@@ -983,11 +997,12 @@ function renderNotesCapture(root){
 
       state.hasImage = true;
       toolbar.style.display = 'flex';
+      wrap.querySelector('#cFloatingTools').style.display = 'flex';
       wrap.querySelector('#cAnalyzeBtn').style.display = 'inline-block';
       capturedImages[0] = src;
       renderExtraThumbs();
+      strokes = []; redoStack = [];
       attachCanvasEvents();
-      pushHistory();
     };
     probe.src = src;
   }
@@ -1016,53 +1031,9 @@ function renderNotesCapture(root){
     for(const it of items){ if(it.type.startsWith('image/')){ const f=it.getAsFile(); const r=new FileReader(); r.onload=ev=>loadImage(ev.target.result); r.readAsDataURL(f); e.preventDefault(); break; } }
   });
 
-  // ---------- 실행취소/다시실행 ----------
-  let history = [], redoStack = [];
-  function pushHistory(){
-    if(!canvas) return;
-    history.push(canvas.toDataURL());
-    if(history.length > 30) history.shift();
-    redoStack = [];
-  }
-  function restoreFrom(dataUrl, sync){
-    const dpr = window.devicePixelRatio || 1;
-    const img = new Image();
-    const draw = ()=>{
-      ctx.save(); ctx.setTransform(1,0,0,1,0,0);
-      ctx.clearRect(0,0,canvas.width, canvas.height);
-      ctx.restore();
-      ctx.drawImage(img,0,0,canvas.width/dpr,canvas.height/dpr);
-    };
-    img.onload = draw;
-    img.src = dataUrl;
-    if(sync && img.complete) draw();
-  }
-  wrap.querySelector('#btnUndo').addEventListener('click', ()=>{
-    if(!canvas || history.length <= 1) return;
-    redoStack.push(history.pop());
-    restoreFrom(history[history.length-1]);
-  });
-  wrap.querySelector('#btnRedo').addEventListener('click', ()=>{
-    if(!canvas || redoStack.length === 0) return;
-    const next = redoStack.pop();
-    history.push(next);
-    restoreFrom(next);
-  });
-  wrap.querySelector('#btnClearCanvas').addEventListener('click', ()=>{
-    if(!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    ctx.clearRect(0,0,canvas.width/dpr, canvas.height/dpr);
-    pushHistory();
-  });
+  // ---------- 획(stroke) 기반 드로잉 엔진 ----------
+  let strokes = [], redoStack = [];
 
-  // ---------- 드로잉 ----------
-  let drawing=false, lastX=0, lastY=0, shapeStartX=0, shapeStartY=0, shapeSnapshot=null;
-  function pos(e){ const r = canvas.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
-  function strokeStyleFor(tool){
-    if(tool==='highlighter') return {alpha:0.35, comp:'multiply'};
-    if(tool==='eraser') return {alpha:1, comp:'destination-out'};
-    return {alpha:1, comp:'source-over'};
-  }
   function widthFor(tool, size, pressure){
     if(tool==='pencil') return size*(0.4+pressure*1.2);
     if(tool==='fountain') return size*(0.3+pressure*1.4);
@@ -1071,75 +1042,209 @@ function renderNotesCapture(root){
     if(tool==='eraser') return size*2;
     return size;
   }
+
+  function renderAllStrokes(){
+    if(!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.save(); ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0,0,canvas.width, canvas.height);
+    ctx.restore();
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    strokes.forEach(s=> paintStroke(s));
+  }
+
+  function paintStroke(s){
+    if(s.type==='pen' || s.type==='erase'){
+      const tool = s.type==='erase' ? 'eraser' : s.tool;
+      ctx.globalCompositeOperation = tool==='eraser' ? 'destination-out' : (tool==='highlighter' ? 'multiply' : 'source-over');
+      ctx.globalAlpha = tool==='highlighter' ? 0.35 : 1;
+      ctx.strokeStyle = tool==='eraser' ? '#000' : s.color;
+      ctx.fillStyle = tool==='eraser' ? '#000' : s.color;
+      ctx.lineCap='round'; ctx.lineJoin='round';
+      const pts = s.points;
+      if(pts.length===1){
+        const w = widthFor(tool, s.size, pts[0].pressure);
+        ctx.beginPath(); ctx.arc(pts[0].x,pts[0].y,w/2,0,Math.PI*2); ctx.fill();
+      } else {
+        for(let i=0;i<pts.length-1;i++){
+          ctx.lineWidth = widthFor(tool, s.size, pts[i+1].pressure);
+          ctx.beginPath(); ctx.moveTo(pts[i].x,pts[i].y); ctx.lineTo(pts[i+1].x,pts[i+1].y); ctx.stroke();
+        }
+      }
+      ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+    } else if(s.type==='rect'){
+      ctx.globalCompositeOperation='source-over';
+      ctx.strokeStyle = s.color; ctx.lineWidth = Math.max(2, s.size*0.7);
+      ctx.strokeRect(s.x, s.y, s.w, s.h);
+    } else if(s.type==='underline'){
+      ctx.globalCompositeOperation='source-over';
+      ctx.strokeStyle=s.color; ctx.lineWidth=Math.max(3,s.size*0.8); ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(s.x1,s.y1); ctx.lineTo(s.x2,s.y1); ctx.stroke();
+    } else if(s.type==='star'){
+      ctx.globalCompositeOperation='source-over'; ctx.fillStyle=s.color;
+      ctx.beginPath();
+      for(let i=0;i<10;i++){
+        const rad = i%2===0?s.r:s.r*0.45;
+        const ang = (Math.PI/5)*i - Math.PI/2;
+        const px=s.cx+rad*Math.cos(ang), py=s.cy+rad*Math.sin(ang);
+        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.closePath(); ctx.fill();
+    }
+  }
+
+  function commitStroke(s){ strokes.push(s); redoStack=[]; }
+
+  wrap.querySelector('#btnUndo').addEventListener('click', ()=>{
+    if(strokes.length===0) return;
+    redoStack.push(strokes.pop());
+    renderAllStrokes();
+  });
+  wrap.querySelector('#btnRedo').addEventListener('click', ()=>{
+    if(redoStack.length===0) return;
+    strokes.push(redoStack.pop());
+    renderAllStrokes();
+  });
+  wrap.querySelector('#btnClearCanvas').addEventListener('click', ()=>{
+    strokes=[]; redoStack=[]; renderAllStrokes();
+  });
+
+  // ---------- 획 전체 지우기(탭한 획 찾기) ----------
+  function distToSegment(px,py,x1,y1,x2,y2){
+    const dx=x2-x1, dy=y2-y1;
+    const len2 = dx*dx+dy*dy;
+    let t = len2===0 ? 0 : ((px-x1)*dx+(py-y1)*dy)/len2;
+    t = Math.max(0, Math.min(1, t));
+    const cx=x1+t*dx, cy=y1+t*dy;
+    return Math.hypot(px-cx, py-cy);
+  }
+  function hitTestStroke(s, px, py){
+    if(s.type==='pen'){
+      const tol = Math.max(12, s.size);
+      if(s.points.length===1) return Math.hypot(px-s.points[0].x, py-s.points[0].y) < tol;
+      for(let i=0;i<s.points.length-1;i++){
+        if(distToSegment(px,py,s.points[i].x,s.points[i].y,s.points[i+1].x,s.points[i+1].y) < tol) return true;
+      }
+      return false;
+    }
+    if(s.type==='underline') return distToSegment(px,py,s.x1,s.y1,s.x2,s.y1) < Math.max(10,s.size);
+    if(s.type==='rect'){
+      const tol=10;
+      return (Math.abs(px-s.x)<tol && py>=s.y-tol && py<=s.y+s.h+tol) ||
+             (Math.abs(px-(s.x+s.w))<tol && py>=s.y-tol && py<=s.y+s.h+tol) ||
+             (Math.abs(py-s.y)<tol && px>=s.x-tol && px<=s.x+s.w+tol) ||
+             (Math.abs(py-(s.y+s.h))<tol && px>=s.x-tol && px<=s.x+s.w+tol);
+    }
+    if(s.type==='star') return Math.hypot(px-s.cx, py-s.cy) < s.r+10;
+    return false;
+  }
+  function eraseStrokeAt(px, py){
+    for(let i=strokes.length-1; i>=0; i--){
+      if(strokes[i].type==='erase') continue; // 지우개 자국 자체는 대상 아님
+      if(hitTestStroke(strokes[i], px, py)){
+        strokes.splice(i,1);
+        redoStack=[];
+        renderAllStrokes();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------- 실시간 드로잉 ----------
+  let drawing=false, currentStroke=null, shapeStartX=0, shapeStartY=0;
+  let activePenId = null; // 팜 리젝션: 펜이 활성 상태일 땐 손가락 터치 무시
+  let activeTouchIds = new Set(); // 두 손가락 탭 감지용
+  function pos(e){ const r = canvas.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+
   function attachCanvasEvents(){
     canvas.addEventListener('pointerdown', (e)=>{
+      // ---- 팜 리젝션 ----
+      if(e.pointerType === 'pen'){
+        activePenId = e.pointerId;
+      } else if(e.pointerType === 'touch'){
+        activeTouchIds.add(e.pointerId);
+        if(activePenId !== null) return; // 펜 사용 중엔 손가락 입력 무시(손바닥 오인식 방지)
+        if(activeTouchIds.size === 2){
+          // 두 손가락 탭 = 실행취소
+          wrap.querySelector('#btnUndo')?.click();
+          return;
+        }
+        if(activeTouchIds.size > 1) return; // 세 손가락 이상은 무시
+      }
+
       canvas.setPointerCapture(e.pointerId);
       const p = pos(e);
       drawing = true;
+
+      if(state.tool==='eraser-stroke'){
+        state.hasAnnotation = true;
+        eraseStrokeAt(p.x, p.y);
+        return;
+      }
       if(['rect','underline','star'].includes(state.tool)){
-        shapeStartX=p.x; shapeStartY=p.y; shapeSnapshot = canvas.toDataURL();
-        if(state.tool==='star'){ drawStar(p.x,p.y,26); drawing=false; state.hasAnnotation=true; pushHistory(); }
+        shapeStartX=p.x; shapeStartY=p.y;
+        if(state.tool==='star'){
+          state.hasAnnotation = true;
+          commitStroke({type:'star', color:state.color, r:26, cx:p.x, cy:p.y});
+          renderAllStrokes();
+          drawing=false;
+        }
         return;
       }
       state.hasAnnotation = true;
-      lastX=p.x; lastY=p.y;
       const pressure = e.pressure>0?e.pressure:0.5;
-      drawDot(p.x,p.y,pressure);
+      const type = state.tool==='eraser' ? 'erase' : 'pen';
+      currentStroke = { type, tool:state.tool, color:state.color, size:state.size, points:[{x:p.x,y:p.y,pressure}] };
+      paintStroke(currentStroke);
     });
     canvas.addEventListener('pointermove', (e)=>{
+      if(e.pointerType==='touch' && activePenId!==null) return;
       if(!drawing) return;
       const p = pos(e);
       const pressure = e.pressure>0?e.pressure:0.5;
+
+      if(state.tool==='eraser-stroke'){ eraseStrokeAt(p.x, p.y); return; }
+
       if(state.tool==='rect' || state.tool==='underline'){
-        restoreFrom(shapeSnapshot, true);
-        if(state.tool==='rect') drawRectPreview(shapeStartX,shapeStartY,p.x,p.y);
-        else drawUnderlinePreview(shapeStartX,shapeStartY,p.x,p.y);
+        renderAllStrokes();
+        if(state.tool==='rect'){
+          ctx.globalCompositeOperation='source-over'; ctx.strokeStyle=state.color; ctx.lineWidth=Math.max(2,state.size*0.7);
+          ctx.strokeRect(Math.min(shapeStartX,p.x), Math.min(shapeStartY,p.y), Math.abs(p.x-shapeStartX), Math.abs(p.y-shapeStartY));
+        } else {
+          ctx.globalCompositeOperation='source-over'; ctx.strokeStyle=state.color; ctx.lineWidth=Math.max(3,state.size*0.8); ctx.lineCap='round';
+          ctx.beginPath(); ctx.moveTo(shapeStartX,shapeStartY); ctx.lineTo(p.x,shapeStartY); ctx.stroke();
+        }
         return;
       }
-      drawLine(lastX,lastY,p.x,p.y,pressure);
-      lastX=p.x; lastY=p.y;
+      if(!currentStroke) return;
+      const prevPt = currentStroke.points[currentStroke.points.length-1];
+      currentStroke.points.push({x:p.x,y:p.y,pressure});
+      const seg = { ...currentStroke, points:[prevPt, {x:p.x,y:p.y,pressure}] };
+      paintStroke(seg);
     });
     ['pointerup','pointerleave','pointercancel'].forEach(evt=>{
-      canvas.addEventListener(evt, ()=>{ if(!drawing) return; drawing=false; pushHistory(); });
+      canvas.addEventListener(evt, (e)=>{
+        if(e.pointerType==='pen' && e.pointerId===activePenId) activePenId = null;
+        if(e.pointerType==='touch') activeTouchIds.delete(e.pointerId);
+        if(!drawing) return;
+        drawing = false;
+        if(state.tool==='eraser-stroke') return;
+        if(state.tool==='rect' || state.tool==='underline'){
+          const p = pos(e);
+          if(Math.abs(p.x-shapeStartX)>3 || Math.abs(p.y-shapeStartY)>3){
+            if(state.tool==='rect'){
+              commitStroke({type:'rect', color:state.color, size:state.size, x:Math.min(shapeStartX,p.x), y:Math.min(shapeStartY,p.y), w:Math.abs(p.x-shapeStartX), h:Math.abs(p.y-shapeStartY)});
+            } else {
+              commitStroke({type:'underline', color:state.color, size:state.size, x1:shapeStartX, y1:shapeStartY, x2:p.x});
+            }
+          }
+          renderAllStrokes();
+          return;
+        }
+        if(currentStroke){ commitStroke(currentStroke); currentStroke=null; }
+      });
     });
-  }
-  function drawDot(x,y,pressure){
-    const {alpha,comp} = strokeStyleFor(state.tool);
-    ctx.globalCompositeOperation=comp; ctx.globalAlpha=alpha;
-    ctx.fillStyle = state.tool==='eraser' ? '#000' : state.color;
-    const w = widthFor(state.tool, state.size, pressure);
-    ctx.beginPath(); ctx.arc(x,y,w/2,0,Math.PI*2); ctx.fill();
-    ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
-  }
-  function drawLine(x1,y1,x2,y2,pressure){
-    const {alpha,comp} = strokeStyleFor(state.tool);
-    ctx.globalCompositeOperation=comp; ctx.globalAlpha=alpha;
-    ctx.strokeStyle = state.tool==='eraser' ? '#000' : state.color;
-    ctx.lineCap='round'; ctx.lineJoin='round';
-    ctx.lineWidth = widthFor(state.tool, state.size, pressure);
-    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-    ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
-  }
-  function drawRectPreview(x1,y1,x2,y2){
-    ctx.globalCompositeOperation='source-over';
-    ctx.strokeStyle = state.color; ctx.lineWidth = Math.max(2, state.size*0.7);
-    ctx.strokeRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
-  }
-  function drawUnderlinePreview(x1,y1,x2,y2){
-    ctx.globalCompositeOperation='source-over';
-    ctx.strokeStyle=state.color; ctx.lineWidth=Math.max(3,state.size*0.8); ctx.lineCap='round';
-    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y1); ctx.stroke();
-  }
-  function drawStar(cx,cy,r){
-    ctx.globalCompositeOperation='source-over'; ctx.fillStyle=state.color;
-    ctx.beginPath();
-    for(let i=0;i<10;i++){
-      const rad = i%2===0?r:r*0.45;
-      const ang = (Math.PI/5)*i - Math.PI/2;
-      const px=cx+rad*Math.cos(ang), py=cy+rad*Math.sin(ang);
-      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-    }
-    ctx.closePath(); ctx.fill();
   }
 
   wrap.querySelector('#cAnalyzeBtn').addEventListener('click', function(){
@@ -1167,6 +1272,10 @@ function renderNotesCapture(root){
     }, 900);
   }.bind(wrap.querySelector('#cAnalyzeBtn')));
 
+  wrap.querySelector('#cAnswerClear').addEventListener('click', ()=>{
+    const input = wrap.querySelector('#cAnswer');
+    input.value=''; input.focus();
+  });
   wrap.querySelector('#cSaveBtn').addEventListener('click', ()=>{
     const subject = wrap.querySelector('#cSubject').value;
     const note = {
@@ -1323,6 +1432,17 @@ function renderMindmap(root){
   function findParent(node,id,p=null){ if(node.id===id) return p; for(const c of node.children){ const f=findParent(c,id,node); if(f) return f; } return null; }
 
   const W=150, H=36;
+  const DEPTH_COLORS = ['#E8A33D','#3E6B9E','#4FC3C0','#7A5FA8','#C97A52','#6C9A5E'];
+  const NODE_COLOR_CHOICES = ['#E8A33D','#3E6B9E','#4FC3C0','#7A5FA8','#C97A52','#6C9A5E','#C24B3F','#2C3140'];
+  function colorForNode(n){
+    if(n.color) return n.color;
+    return DEPTH_COLORS[Math.min(n._depth||0, DEPTH_COLORS.length-1)];
+  }
+  function textColorFor(hex){
+    const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+    const lum = (0.299*r+0.587*g+0.114*b)/255;
+    return lum > 0.6 ? '#241705' : '#F8F5EE';
+  }
 
   // 레거시 데이터(좌표 없는 노드)에 위치를 자동 배정
   function ensurePosition(node, parent, siblingIdx){
@@ -1380,7 +1500,7 @@ function renderMindmap(root){
     const root2 = liveRoot();
     ensurePosition(root2, null, 0);
 
-    const flatAll = []; (function collect(n){ flatAll.push(n); n.children.forEach(collect); })(root2);
+    const flatAll = []; (function collect(n, depth){ n._depth = depth; flatAll.push(n); n.children.forEach(c=>collect(c, depth+1)); })(root2, 0);
 
     let minX=root2.x, minY=root2.y, maxX=root2.x+W, maxY=root2.y+H;
     flatAll.forEach(n=>{ minX=Math.min(minX,n.x); minY=Math.min(minY,n.y); maxX=Math.max(maxX,n.x+W); maxY=Math.max(maxY,n.y+H); });
@@ -1429,11 +1549,13 @@ function renderMindmap(root){
       const sel = mmSelectedId[currentSubject]===n.id;
       el.dataset.nodeId = n.id;
       const sx = n.x+offX, sy = n.y+offY;
-      el.style.cssText = `position:absolute;left:${sx}px;top:${sy}px;width:${W}px;height:${H}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:${n.id==='root'?'var(--amber)':'var(--card)'};color:${n.id==='root'?'#241705':'var(--paper)'};border:1.5px solid ${sel?'var(--amber)':'rgba(var(--border-rgb),0.12)'};border-radius:9px;padding:0 8px;font-size:12px;font-weight:${n.id==='root'?'700':'500'};cursor:grab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;touch-action:none;`;
+      const bgColor = colorForNode(n);
+      const txtColor = textColorFor(bgColor);
+      el.style.cssText = `position:absolute;left:${sx}px;top:${sy}px;width:${W}px;height:${H}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:${bgColor};color:${txtColor};border:1.5px solid ${sel?'#fff':'rgba(var(--border-rgb),0.12)'};border-radius:9px;padding:0 8px;font-size:12px;font-weight:${n.id==='root'?'700':'500'};cursor:grab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;touch-action:none;`;
 
       if(editingId === n.id){
         el.style.overflow = 'visible';
-        el.innerHTML = `<input id="inlineEdit" lang="ko" value="${(n.label||'').replace(/"/g,'&quot;')}" placeholder="키워드 입력" style="width:100%;height:100%;background:var(--desk-2);border:1.5px solid var(--blue);border-radius:8px;color:var(--paper);font-size:12px;text-align:center;padding:0 6px;box-sizing:border-box;touch-action:manipulation;-webkit-user-select:text;user-select:text;">`;
+        el.innerHTML = `<input id="inlineEdit" lang="ko" value="${(n.label||'').replace(/"/g,'&quot;')}" placeholder="키워드 입력" style="width:100%;height:100%;background:var(--desk-2);border:1.5px solid var(--blue);border-radius:8px;color:var(--paper);font-size:12px;text-align:center;padding:0 20px 0 6px;box-sizing:border-box;touch-action:manipulation;-webkit-user-select:text;user-select:text;"><button id="inlineEditClear" title="전체 지우기" style="position:absolute;right:3px;top:50%;transform:translateY(-50%);width:16px;height:16px;border-radius:50%;border:none;background:var(--danger);color:#fff;font-size:10px;line-height:16px;padding:0;cursor:pointer;">×</button>`;
       } else {
         el.textContent = n.label || '(입력 필요)';
         el.addEventListener('click', (e)=>{
@@ -1538,6 +1660,10 @@ function renderMindmap(root){
       };
       inlineInput.addEventListener('blur', commit);
       inlineInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); inlineInput.blur(); } });
+      canvasWrap.querySelector('#inlineEditClear')?.addEventListener('pointerdown', e=>{
+        e.stopPropagation(); e.preventDefault();
+        inlineInput.value = ''; inlineInput.focus();
+      });
     }
 
     const selId = mmSelectedId[currentSubject];
@@ -1547,13 +1673,44 @@ function renderMindmap(root){
       return;
     }
     panel.innerHTML = `
-      <div class="field" style="margin-bottom:10px;"><label>키워드</label><input id="mmLabel" lang="ko" value="${selNode.label.replace(/"/g,'&quot;')}"></div>
-      <div class="field" style="margin-bottom:10px;"><label>상세 개념</label><textarea id="mmDetail" lang="ko" style="min-height:100px;">${selNode.detail||''}</textarea></div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>키워드</label>
+        <div style="position:relative;">
+          <input id="mmLabel" lang="ko" value="${selNode.label.replace(/"/g,'&quot;')}" style="width:100%;padding-right:30px;box-sizing:border-box;">
+          <button id="mmLabelClear" title="전체 지우기" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;border:none;background:var(--danger);color:#fff;font-size:11px;line-height:18px;padding:0;cursor:pointer;">×</button>
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;color:rgba(var(--text-muted-rgb),0.45);text-transform:uppercase;display:block;margin-bottom:6px;">색상 <span style="font-weight:400;text-transform:none;">(깊이별 자동 · 직접 지정 가능)</span></label>
+        <div id="nodeColorRow" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"></div>
+      </div>
+      <div class="field" style="margin-bottom:10px;"><label>상세 개념</label><textarea id="mmDetail" class="content-text" lang="ko" style="min-height:100px;">${selNode.detail||''}</textarea></div>
       <div style="display:flex;gap:8px;">
         <button class="btn blue" id="mmAdd" style="flex:1;">＋ 자식추가</button>
         ${selNode.id!=='root' ? '<button class="btn danger" id="mmDel">삭제</button>' : ''}
       </div>
     `;
+    const colorRow = panel.querySelector('#nodeColorRow');
+    NODE_COLOR_CHOICES.forEach(c=>{
+      const b = document.createElement('button');
+      const isActive = selNode.color === c;
+      b.style.cssText = `width:24px;height:24px;border-radius:50%;background:${c};border:2px solid ${isActive?'#fff':'transparent'};box-shadow:0 0 0 1px rgba(var(--border-rgb),0.15);cursor:pointer;`;
+      b.addEventListener('click', ()=>{
+        const r = liveRoot(); const node = findNode(r, selId);
+        if(node) node.color = c;
+        draw();
+      });
+      colorRow.appendChild(b);
+    });
+    const resetBtn = document.createElement('button');
+    resetBtn.textContent = '기본값';
+    resetBtn.style.cssText = 'font-size:10.5px;padding:5px 9px;border-radius:999px;border:1px solid rgba(var(--border-rgb),0.15);background:none;color:rgba(var(--text-muted-rgb),0.6);cursor:pointer;';
+    resetBtn.addEventListener('click', ()=>{
+      const r = liveRoot(); const node = findNode(r, selId);
+      if(node) delete node.color;
+      draw();
+    });
+    colorRow.appendChild(resetBtn);
     panel.querySelector('#mmLabel').addEventListener('input', e=>{
       const r = liveRoot();
       const node = findNode(r, selId);
@@ -1563,6 +1720,12 @@ function renderMindmap(root){
       if(nodeEl) nodeEl.textContent = node.label;
     });
     panel.querySelector('#mmLabel').addEventListener('blur', ()=> draw());
+    panel.querySelector('#mmLabelClear').addEventListener('click', ()=>{
+      const input = panel.querySelector('#mmLabel');
+      input.value = ''; input.focus();
+      const r = liveRoot(); const node = findNode(r, selId);
+      if(node) node.label = '새 키워드';
+    });
     panel.querySelector('#mmDetail').addEventListener('input', e=>{
       const r = liveRoot();
       const node = findNode(r, selId);
