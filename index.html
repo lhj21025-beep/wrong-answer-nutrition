@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>오답노트 통합 앱 프로토타입</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&family=Nanum+Gothic:wght@400;700;800&family=Nanum+Myeongjo:wght@400;700&family=Gowun+Dodum&family=Jua&family=Gaegu:wght@400;700&family=Do+Hyeon&family=Black+Han+Sans&family=Nanum+Pen+Script&family=Gamja+Flower&family=IBM+Plex+Sans+KR:wght@400;600&family=Song+Myung&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -401,10 +401,39 @@ function renderHome(root){
         <div style="font-size:24px;font-weight:700;font-family:'Space Grotesk',sans-serif;">${totalChunks}<span style="font-size:12px;font-weight:500;color:rgba(var(--text-muted-rgb),0.4);"> 개</span></div>
       </div>
     </div>
+    <div id="weakListWrap"></div>
     <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.05em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:8px;">과목별 현황</div>
     <div id="subjectCards"></div>
   `;
   root.appendChild(wrap);
+
+  // ---------- 취약 문제 TOP5 (자주 틀리는 순) ----------
+  const weakList = store.notes.filter(n=>(n.wrongCount||0) > 0)
+    .sort((a,b)=> (b.wrongCount||0)-(a.wrongCount||0)).slice(0,5);
+  if(weakList.length){
+    const weakWrap = wrap.querySelector('#weakListWrap');
+    weakWrap.innerHTML = `
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.05em;color:rgba(var(--text-muted-rgb),0.4);text-transform:uppercase;margin-bottom:8px;">🔥 자주 틀리는 문제 TOP${weakList.length}</div>
+      <div style="background:var(--desk-2);border-radius:var(--radius);padding:6px 4px;margin-bottom:18px;">
+        ${weakList.map((n,i)=>`
+          <div class="weak-item" data-id="${n.id}" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer;">
+            <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;color:${i===0?'var(--danger)':'rgba(var(--text-muted-rgb),0.4)'};width:16px;">${i+1}</span>
+            <span style="width:8px;height:8px;border-radius:50%;background:${SUBJECT_COLORS[n.subject]};flex-shrink:0;"></span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${n.unit}</div>
+              <div style="font-size:10.5px;color:rgba(var(--text-muted-rgb),0.4);">${n.subject}</div>
+            </div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--danger);flex-shrink:0;">${n.wrongCount}회 오답</span>
+          </div>`).join('')}
+      </div>
+    `;
+    weakWrap.querySelectorAll('.weak-item').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const note = store.notes.find(n=>n.id==el.dataset.id);
+        if(note) openNoteModal(note);
+      });
+    });
+  }
 
   if(store.showDday){
     const ddayBar = wrap.querySelector('#ddayBar');
@@ -612,7 +641,7 @@ function renderNotes(root){
 }
 
 function renderNotesList(root){
-  const state = { search:'', subjects:new Set(), mistakes:new Set(), dueOnly:false, mode:'card' };
+  const state = { search:'', subjects:new Set(), mistakes:new Set(), tags:new Set(), dueOnly:false, mode:'card' };
   const wrap = document.createElement('div');
   wrap.className = 'pad';
   wrap.innerHTML = `
@@ -624,9 +653,24 @@ function renderNotesList(root){
       <button class="btn ghost" id="conceptModeBtn">개념만★</button>
     </div>
     <div class="row" style="margin-bottom:10px;" id="subjChips"></div>
+    <div class="row" style="margin-bottom:10px;" id="tagChips"></div>
     <div id="resultArea"></div>
   `;
   root.appendChild(wrap);
+
+  const allTags = [...new Set(store.notes.flatMap(n=>n.tags||[]))];
+  if(allTags.length){
+    const tagLabel = document.createElement('span');
+    tagLabel.textContent = '태그:';
+    tagLabel.style.cssText = 'font-size:11px;color:rgba(var(--text-muted-rgb),0.35);align-self:center;margin-right:2px;';
+    wrap.querySelector('#tagChips').appendChild(tagLabel);
+    allTags.forEach(t=>{
+      const chip = document.createElement('button');
+      chip.className = 'chip'; chip.textContent = '#'+t;
+      chip.addEventListener('click', ()=>{ state.tags.has(t)?state.tags.delete(t):state.tags.add(t); chip.classList.toggle('active'); update(); });
+      wrap.querySelector('#tagChips').appendChild(chip);
+    });
+  }
 
   const favChip = document.createElement('button');
   favChip.className = 'chip'; favChip.textContent = '⭐ 즐겨찾기만';
@@ -659,8 +703,9 @@ function renderNotesList(root){
       if(state.favOnly && !n.favorite) return false;
       if(state.collectionId && !(n.collectionIds||[]).includes(state.collectionId)) return false;
       if(state.subjects.size && !state.subjects.has(n.subject)) return false;
+      if(state.tags.size && !(n.tags||[]).some(t=>state.tags.has(t))) return false;
       if(state.search){
-        const hay = (n.ocrText+n.correctConcept+n.wrongReason+n.tags.join(' ')+n.unit).toLowerCase();
+        const hay = (n.ocrText+n.correctConcept+n.wrongReason+n.tags.join(' ')+n.unit+(n.handwritingText||'')).toLowerCase();
         if(!hay.includes(state.search)) return false;
       }
       return true;
@@ -729,6 +774,8 @@ function openNoteModal(note){
       ${note.images && note.images.length ? `<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;">${note.images.map(src=>`<img src="${src}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;">`).join('')}</div>` : ''}
       <div class="content-text" style="font-size:12px;margin-bottom:10px;"><b style="color:rgba(var(--text-muted-rgb),0.5);">문제</b><br>${note.ocrText}</div>
       ${note.answer ? `<div style="font-size:12px;margin-bottom:10px;"><b style="color:rgba(var(--text-muted-rgb),0.5);">정답</b> ${note.answer}</div>` : ''}
+      ${note.tags && note.tags.length ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">${note.tags.map(t=>`<span style="font-size:10.5px;padding:3px 8px;border-radius:999px;background:rgba(62,107,158,0.15);color:var(--blue-soft);">#${t}</span>`).join('')}</div>` : ''}
+      ${note.handwritingText ? `<div style="font-size:11px;color:rgba(var(--text-muted-rgb),0.4);margin-bottom:10px;">📝 ${note.handwritingText} <span style="opacity:0.7;">(베타)</span></div>` : ''}
       <div class="content-text" style="font-size:12px;margin-bottom:10px;"><b style="color:rgba(var(--text-muted-rgb),0.5);">오답사유</b><br>${note.wrongReason}</div>
       <div class="content-text" style="font-size:12px;background:rgba(232,163,61,0.1);border-radius:8px;padding:9px 11px;margin-bottom:14px;"><b style="color:var(--amber-soft);">정확한 개념</b><br>${note.correctConcept}</div>
       <div style="margin-bottom:14px;">
@@ -842,6 +889,7 @@ function renderNotesCapture(root){
 
     <button class="btn blue" id="cAnalyzeBtn" style="margin-bottom:12px;display:none;">이미지 분석하기(OCR)</button>
     <div id="cOcrResult" style="display:none;margin-bottom:12px;"></div>
+    <input type="hidden" id="cHandwritingText" value="">
     <div style="margin-bottom:14px;">
       <label style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;color:rgba(var(--text-muted-rgb),0.45);text-transform:uppercase;display:block;margin-bottom:6px;">추가 이미지 (표·그림 등 여러 장 첨부 가능)</label>
       <div id="extraImagesRow" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
@@ -851,6 +899,10 @@ function renderNotesCapture(root){
     <div class="row">
       <div class="field"><label>과목</label><select id="cSubject">${SUBJECTS.map(s=>`<option>${s}</option>`).join('')}</select></div>
       <div class="field"><label>오답유형</label><select id="cMistake">${MISTAKE_TYPES.map(m=>`<option>${m}</option>`).join('')}</select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>태그 <span style="font-weight:400;text-transform:none;color:rgba(var(--text-muted-rgb),0.35);">(쉼표로 구분, 예: 혈청알부민, 생화학판정)</span></label><input id="cTags" lang="ko" placeholder="태그1, 태그2"></div>
+      <div class="field"></div>
     </div>
     <div class="row">
       <div class="field">
@@ -1258,10 +1310,16 @@ function renderNotesCapture(root){
         <div style="margin-bottom:6px;">${mock.ocrText}</div>
         <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--blue-soft);">추정 과목 ${mock.subject} (${mock.confidence}%) · ${mock.tags.join(', ')}</div>`;
       wrap.querySelector('#cSubject').value = mock.subject;
+      if(!wrap.querySelector('#cTags').value.trim()){
+        wrap.querySelector('#cTags').value = mock.tags.join(', ');
+      }
 
       if(state.hasAnnotation){
         const detectedAnswer = '③';
-        resultHtml += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(62,107,158,0.25);font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--amber-soft);">✏️ 여백 필기에서 정답 표시 감지: <b>${detectedAnswer}</b> (인식률 낮을 수 있음)</div>`;
+        const handwritingNote = '여백 필기: "혈청 알부민 — 반감기 20일" 메모 감지됨';
+        wrap.querySelector('#cHandwritingText').value = handwritingNote;
+        resultHtml += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(62,107,158,0.25);font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--amber-soft);">✏️ 여백 필기에서 정답 표시 감지: <b>${detectedAnswer}</b> (인식률 낮을 수 있음)</div>
+        <div style="margin-top:4px;font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(var(--text-muted-rgb),0.5);">📝 ${handwritingNote} <span style="opacity:0.6;">(베타 · 검색 가능하게 저장됨)</span></div>`;
         wrap.querySelector('#cAnswer').value = detectedAnswer;
         wrap.querySelector('#cAnswerHint').style.display = 'block';
       }
@@ -1281,11 +1339,12 @@ function renderNotesCapture(root){
     const note = {
       id: store.nextNoteId++,
       subject, unit: wrap.querySelector('#cOcrResult').style.display==='block' ? '생화학적 판정' : '새 오답노트',
-      tags:[], mistakeType: wrap.querySelector('#cMistake').value,
+      tags: wrap.querySelector('#cTags').value.split(',').map(t=>t.trim()).filter(Boolean), mistakeType: wrap.querySelector('#cMistake').value,
       ocrText: '(캡처된 문제 이미지)',
       answer: wrap.querySelector('#cAnswer').value || '',
       wrongReason: wrap.querySelector('#cWrongReason').value || '(미입력)',
       correctConcept: wrap.querySelector('#cConcept').value || '(미입력)',
+      handwritingText: wrap.querySelector('#cHandwritingText').value || '',
       source:'직접 등록', createdAt:'2026-08-08', nextReviewAt:'2026-08-09', masteryLevel:0, reviewCount:0, correctCount:0, wrongCount:0, favorite:false, collectionIds:[], images: capturedImages.slice(),
     };
     store.notes.push(note);
@@ -1298,13 +1357,23 @@ function renderNotesCapture(root){
 function renderQuizSetup(root){
   const wrap = document.createElement('div');
   wrap.className = 'pad';
-  const state = { subjects:new Set() };
+  const state = { subjects:new Set(), mode:'mc' };
   wrap.innerHTML = `
-    <div style="font-size:13px;color:rgba(var(--text-muted-rgb),0.6);line-height:1.6;margin-bottom:12px;">저장된 오답노트의 정확한 개념으로 4지선다 문제를 자동 생성합니다. 과목을 선택하지 않으면 전체에서 출제해요.</div>
+    <div style="font-size:13px;color:rgba(var(--text-muted-rgb),0.6);line-height:1.6;margin-bottom:12px;">저장된 오답노트의 정확한 개념으로 문제를 자동 생성합니다. 과목을 선택하지 않으면 전체에서 출제해요.</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button class="chip active" id="modeMC" style="flex:1;padding:9px;">객관식 (4지선다)</button>
+      <button class="chip" id="modeCloze" style="flex:1;padding:9px;">빈칸채우기</button>
+    </div>
     <div class="row" style="margin-bottom:16px;" id="quizSubjChips"></div>
     <button class="btn primary" id="startQuizBtn" style="width:100%;padding:13px;">퀴즈 시작</button>
   `;
   root.appendChild(wrap);
+  wrap.querySelector('#modeMC').addEventListener('click', ()=>{
+    state.mode='mc'; wrap.querySelector('#modeMC').classList.add('active'); wrap.querySelector('#modeCloze').classList.remove('active');
+  });
+  wrap.querySelector('#modeCloze').addEventListener('click', ()=>{
+    state.mode='cloze'; wrap.querySelector('#modeCloze').classList.add('active'); wrap.querySelector('#modeMC').classList.remove('active');
+  });
   SUBJECTS.forEach(s=>{
     const chip = document.createElement('button');
     chip.className='chip'; chip.textContent=s;
@@ -1313,9 +1382,86 @@ function renderQuizSetup(root){
   });
   wrap.querySelector('#startQuizBtn').addEventListener('click', ()=>{
     const pool = state.subjects.size ? store.notes.filter(n=>state.subjects.has(n.subject)) : store.notes;
-    if(pool.length < 2){ alert('퀴즈를 만들려면 오답노트가 최소 2건 이상 필요해요.'); return; }
-    openQuizSession(pool);
+    if(state.mode==='mc'){
+      if(pool.length < 2){ alert('퀴즈를 만들려면 오답노트가 최소 2건 이상 필요해요.'); return; }
+      openQuizSession(pool);
+    } else {
+      const clozePool = pool.filter(n=> clozeCandidate(n.correctConcept));
+      if(clozePool.length < 1){ alert('빈칸채우기를 만들 만한 개념 텍스트가 부족해요 (조금 더 긴 문장이 필요해요).'); return; }
+      openClozeSession(clozePool);
+    }
   });
+}
+
+function clozeCandidate(text){
+  if(!text) return false;
+  const tokens = text.split(/[\s,.·()]+/).filter(t=>t.length>=2);
+  return tokens.length > 0;
+}
+function pickClozeToken(text){
+  const tokens = [...new Set(text.split(/[\s,.·()]+/).filter(t=>t.length>=2))];
+  tokens.sort((a,b)=> b.length-a.length);
+  return tokens[0];
+}
+
+function openClozeSession(pool){
+  let idx = 0, correct = 0, wrong = 0;
+  const questions = [...pool].sort(()=>Math.random()-0.5);
+  const backdrop = document.createElement('div');
+  backdrop.style.cssText = 'position:fixed;inset:0;background:var(--desk);z-index:400;display:flex;flex-direction:column;';
+  document.body.appendChild(backdrop);
+
+  function draw(){
+    if(idx >= questions.length){
+      backdrop.innerHTML = `
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;">
+          <div style="font-size:34px;margin-bottom:10px;">✏️</div>
+          <div style="font-size:16px;font-weight:700;margin-bottom:6px;">빈칸채우기 완료!</div>
+          <div style="font-size:13px;color:rgba(var(--text-muted-rgb),0.5);margin-bottom:20px;">정답 ${correct} / ${questions.length}</div>
+          <button class="btn primary" id="clozeDone">오답노트로</button>
+        </div>`;
+      backdrop.querySelector('#clozeDone').addEventListener('click', ()=>{ backdrop.remove(); render(); });
+      return;
+    }
+    const n = questions[idx];
+    const term = pickClozeToken(n.correctConcept);
+    const blanked = n.correctConcept.split(term).join('　　＿＿＿＿　　');
+    backdrop.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid rgba(var(--border-rgb),0.08);">
+        <button id="clozeClose" style="background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:28px;height:28px;border-radius:50%;cursor:pointer;">✕</button>
+        <div style="flex:1;text-align:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:rgba(var(--text-muted-rgb),0.5);">${idx+1} / ${questions.length}</div>
+        <div style="width:28px;"></div>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:24px;">
+        <div style="font-size:10.5px;font-weight:700;color:var(--amber-soft);text-align:center;margin-bottom:10px;">${n.subject} · ${n.unit}</div>
+        <div style="background:var(--card);border-radius:14px;padding:18px;font-size:14px;line-height:1.8;text-align:center;margin-bottom:18px;">${blanked}</div>
+        <input id="clozeInput" lang="ko" placeholder="빈칸에 들어갈 단어를 입력하세요" style="width:100%;box-sizing:border-box;padding:12px;border-radius:10px;font-size:14px;text-align:center;margin-bottom:12px;">
+        <div id="clozeResult"></div>
+      </div>
+      <div id="clozeAction" style="padding:16px 20px calc(16px + env(safe-area-inset-bottom));border-top:1px solid rgba(var(--border-rgb),0.08);"></div>
+    `;
+    backdrop.querySelector('#clozeClose').addEventListener('click', ()=>{ backdrop.remove(); render(); });
+    const input = backdrop.querySelector('#clozeInput');
+    const actionArea = backdrop.querySelector('#clozeAction');
+    actionArea.innerHTML = `<button class="btn primary" id="clozeCheck" style="width:100%;padding:13px;">확인</button>`;
+    function check(){
+      const isCorrect = input.value.trim().replace(/\s/g,'') === term.replace(/\s/g,'');
+      backdrop.querySelector('#clozeResult').innerHTML = `
+        <div style="font-size:13px;padding:10px 12px;border-radius:10px;background:${isCorrect?'rgba(62,107,158,0.15)':'rgba(201,122,82,0.15)'};color:${isCorrect?'var(--blue-soft)':'var(--danger)'};text-align:center;font-weight:700;">
+          ${isCorrect? '정답이에요! 🎉' : `아쉬워요 — 정답은 "${term}" 이에요`}
+        </div>`;
+      input.disabled = true;
+      const realNote = store.notes.find(x=>x.id===n.id);
+      realNote.reviewCount = (realNote.reviewCount||0)+1;
+      if(isCorrect){ realNote.correctCount=(realNote.correctCount||0)+1; correct++; } else { realNote.wrongCount=(realNote.wrongCount||0)+1; wrong++; }
+      actionArea.innerHTML = `<button class="btn primary" id="clozeNext" style="width:100%;padding:13px;">다음</button>`;
+      actionArea.querySelector('#clozeNext').addEventListener('click', ()=>{ idx++; draw(); });
+    }
+    backdrop.querySelector('#clozeCheck').addEventListener('click', check);
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); check(); } });
+    setTimeout(()=> input.focus(), 50);
+  }
+  draw();
 }
 
 function openQuizSession(pool){
@@ -1443,6 +1589,22 @@ function renderMindmap(root){
   const W=150, H=36;
   const DEPTH_COLORS = ['#E8A33D','#3E6B9E','#5B8C3A','#C24B3F','#7A5FA8','#2E9E97'];
   const NODE_COLOR_CHOICES = ['#E8A33D','#3E6B9E','#4FC3C0','#7A5FA8','#C97A52','#6C9A5E','#C24B3F','#2C3140'];
+  const PINNED_FONTS = [
+    {v:"'Noto Sans KR',sans-serif", label:'기본(Noto Sans KR)'},
+    {v:"'Nanum Gothic',sans-serif", label:'나눔고딕'},
+    {v:"'Jua',sans-serif", label:'주아체'},
+    {v:"'Gowun Dodum',sans-serif", label:'고운돋움'},
+    {v:"'Nanum Myeongjo',serif", label:'나눔명조'},
+  ];
+  const MORE_FONTS = [
+    {v:"'Gaegu',cursive", label:'개구체'},
+    {v:"'Do Hyeon',sans-serif", label:'도현체'},
+    {v:"'Black Han Sans',sans-serif", label:'검은고딕'},
+    {v:"'Nanum Pen Script',cursive", label:'나눔손글씨 펜'},
+    {v:"'Gamja Flower',cursive", label:'감자꽃체'},
+    {v:"'IBM Plex Sans KR',sans-serif", label:'IBM Plex Sans'},
+    {v:"'Song Myung',serif", label:'송명체'},
+  ];
   function colorForNode(n){
     if(n.color) return n.color;
     return DEPTH_COLORS[Math.min(n._depth||0, DEPTH_COLORS.length-1)];
@@ -1599,7 +1761,8 @@ function renderMindmap(root){
       const sx = n.x+offX, sy = n.y+offY;
       const bgColor = colorForNode(n);
       const txtColor = textColorFor(bgColor);
-      el.style.cssText = `position:absolute;left:${sx}px;top:${sy}px;width:${W}px;height:${H}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:${bgColor};color:${txtColor};border:1.5px solid ${sel?'#fff':'rgba(var(--border-rgb),0.12)'};border-radius:9px;padding:0 8px;font-size:12px;font-weight:${n.id==='root'?'700':'500'};cursor:grab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;touch-action:none;`;
+      const nodeFont = n.fontFamily || PINNED_FONTS[0].v;
+      el.style.cssText = `position:absolute;left:${sx}px;top:${sy}px;width:${W}px;height:${H}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:${bgColor};color:${txtColor};border:1.5px solid ${sel?'#fff':'rgba(var(--border-rgb),0.12)'};border-radius:9px;padding:0 8px;font-size:13px;font-family:${nodeFont};font-weight:${n.id==='root'?'700':'500'};cursor:grab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;touch-action:none;`;
 
       if(editingId === n.id){
         el.style.overflow = 'visible';
@@ -1736,12 +1899,29 @@ function renderMindmap(root){
         <label style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;color:rgba(var(--text-muted-rgb),0.45);text-transform:uppercase;display:block;margin-bottom:6px;">색상 <span style="font-weight:400;text-transform:none;">(깊이별 자동 · 직접 지정 가능)</span></label>
         <div id="nodeColorRow" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"></div>
       </div>
-      <div class="field" style="margin-bottom:10px;"><label>상세 개념</label><textarea id="mmDetail" class="content-text" lang="ko" style="min-height:100px;">${selNode.detail||''}</textarea></div>
+      <div style="margin-bottom:10px;">
+        <label style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;color:rgba(var(--text-muted-rgb),0.45);text-transform:uppercase;display:block;margin-bottom:6px;">글꼴</label>
+        <select id="mmFontSelect" style="width:100%;background:rgba(var(--border-rgb),0.05);border:1px solid rgba(var(--border-rgb),0.1);border-radius:8px;color:var(--paper);padding:8px 10px;font-size:13px;">
+          <optgroup label="자주 사용">
+            ${PINNED_FONTS.map(f=>`<option value="${f.v}">${f.label}</option>`).join('')}
+          </optgroup>
+          <optgroup label="전체 글꼴">
+            ${MORE_FONTS.map(f=>`<option value="${f.v}">${f.label}</option>`).join('')}
+          </optgroup>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:10px;"><label>상세 개념</label><textarea id="mmDetail" class="content-text" lang="ko" style="min-height:100px;font-family:${selNode.fontFamily || PINNED_FONTS[0].v};">${selNode.detail||''}</textarea></div>
       <div style="display:flex;gap:8px;">
         <button class="btn blue" id="mmAdd" style="flex:1;">＋ 자식추가</button>
         ${selNode.id!=='root' ? '<button class="btn danger" id="mmDel">삭제</button>' : ''}
       </div>
     `;
+    panel.querySelector('#mmFontSelect').value = selNode.fontFamily || PINNED_FONTS[0].v;
+    panel.querySelector('#mmFontSelect').addEventListener('change', e=>{
+      const r = liveRoot(); const node = findNode(r, selId);
+      if(node) node.fontFamily = e.target.value;
+      draw();
+    });
     const colorRow = panel.querySelector('#nodeColorRow');
     NODE_COLOR_CHOICES.forEach(c=>{
       const b = document.createElement('button');
