@@ -1634,7 +1634,7 @@ function renderMindmap(root){
   wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;min-height:0;';
   wrap.innerHTML = `<div class="row" style="padding:14px 20px 6px;gap:6px;flex-shrink:0;" id="mmTabs"></div>
     <div style="display:flex;align-items:center;gap:8px;padding:0 20px 6px;flex-shrink:0;flex-wrap:wrap;">
-      <span style="font-size:11px;color:rgba(var(--text-muted-rgb),0.4);flex:1;min-width:180px;">💡 ＋버튼 또는 노드 가장자리에서 선을 그어 키워드 추가 · 노드 중앙을 드래그하면 이동</span>
+      <span style="font-size:11px;color:rgba(var(--text-muted-rgb),0.4);flex:1;min-width:180px;">💡 노드 바깥 4개 손잡이(●)를 드래그해서 키워드 추가 · 노드 자체를 드래그하면 이동</span>
       <button class="btn ghost" id="mmAutoLayout" style="font-size:11.5px;padding:6px 12px;">🧭 위치 자동정렬</button>
       <button class="btn ghost" id="mmRevertLayout" style="font-size:11.5px;padding:6px 12px;" disabled>↩ 이전 위치로</button>
     </div>
@@ -1894,41 +1894,16 @@ function renderMindmap(root){
         }
       }
 
-      // ---------- 드래그 (중앙=이동, 가장자리=펜으로 선 그어서 자녀 만들기) ----------
-      let dragging=false, spawning=false, sxStart=0, syStart=0, oxStart=0, oyStart=0;
-      let spawnLine = null;
-      const EDGE = 14;
+      // ---------- 드래그: 노드 자체는 항상 "이동"만 ----------
+      let dragging=false, sxStart=0, syStart=0, oxStart=0, oyStart=0;
       el.addEventListener('pointerdown', (e)=>{
         if(editingId === n.id) return;
-        const rect = el.getBoundingClientRect();
-        const lx = e.clientX-rect.left, ly = e.clientY-rect.top;
-        const nearEdge = lx<EDGE || ly<EDGE || (rect.width-lx)<EDGE || (rect.height-ly)<EDGE;
         el.setPointerCapture(e.pointerId);
-        if(nearEdge){
-          spawning = true; dragMoved = false;
-          sxStart=e.clientX; syStart=e.clientY;
-          spawnLine = document.createElementNS('http://www.w3.org/2000/svg','line');
-          spawnLine.setAttribute('stroke','var(--blue)'); spawnLine.setAttribute('stroke-width','2.5'); spawnLine.setAttribute('stroke-dasharray','5,4');
-          const startX = n.x+offX+W/2, startY = n.y+offY+H/2;
-          spawnLine.setAttribute('x1', startX); spawnLine.setAttribute('y1', startY);
-          spawnLine.setAttribute('x2', startX); spawnLine.setAttribute('y2', startY);
-          svg.appendChild(spawnLine);
-        } else {
-          dragging = true; dragMoved = false;
-          el.style.cursor = 'grabbing';
-          sxStart=e.clientX; syStart=e.clientY; oxStart=n.x; oyStart=n.y;
-        }
+        dragging = true; dragMoved = false;
+        el.style.cursor = 'grabbing';
+        sxStart=e.clientX; syStart=e.clientY; oxStart=n.x; oyStart=n.y;
       });
       el.addEventListener('pointermove', (e)=>{
-        if(spawning){
-          const dx = e.clientX-sxStart, dy = e.clientY-syStart;
-          if(Math.abs(dx)>3 || Math.abs(dy)>3) dragMoved = true;
-          const shell = wrap.querySelector('#mmCanvasShell');
-          const shellRect = shell.getBoundingClientRect();
-          const localX = e.clientX-shellRect.left+shell.scrollLeft, localY = e.clientY-shellRect.top+shell.scrollTop;
-          if(spawnLine){ spawnLine.setAttribute('x2', localX); spawnLine.setAttribute('y2', localY); }
-          return;
-        }
         if(!dragging) return;
         const dx = e.clientX-sxStart, dy = e.clientY-syStart;
         if(Math.abs(dx)>3 || Math.abs(dy)>3) dragMoved = true;
@@ -1938,20 +1913,59 @@ function renderMindmap(root){
         updateEdgesFor();
       });
       ['pointerup','pointercancel'].forEach(evt=>{
-        el.addEventListener(evt, (e)=>{
-          if(spawning){
-            spawning = false;
-            const endX = parseFloat(spawnLine?.getAttribute('x2')||0), endY = parseFloat(spawnLine?.getAttribute('y2')||0);
-            if(spawnLine) spawnLine.remove();
-            if(dragMoved){
-              addChildTo(nodeId, {x: endX-offX, y: endY-offY});
-            }
-            return;
-          }
+        el.addEventListener(evt, ()=>{
           if(!dragging) return;
           dragging = false; el.style.cursor='grab';
           if(dragMoved) draw();
         });
+      });
+
+      // ---------- 자식 만들기 전용 손잡이 4개 (노드 바깥 상하좌우) ----------
+      const HANDLE_R = 9;
+      const handlePositions = [
+        {dx: W/2, dy: -14},      // 위
+        {dx: W/2, dy: H+14},     // 아래
+        {dx: -14, dy: H/2},      // 왼쪽
+        {dx: W+14, dy: H/2},     // 오른쪽
+      ];
+      handlePositions.forEach(hp=>{
+        const handle = document.createElement('div');
+        handle.title = '드래그해서 자식 키워드 만들기';
+        handle.style.cssText = `position:absolute;left:${sx+hp.dx-HANDLE_R}px;top:${sy+hp.dy-HANDLE_R}px;width:${HANDLE_R*2}px;height:${HANDLE_R*2}px;border-radius:50%;background:var(--desk-2);border:1.5px solid var(--blue);cursor:crosshair;touch-action:none;z-index:2;`;
+        let spawning=false, spawnLine=null, spawnMoved=false;
+        handle.addEventListener('pointerdown', (e)=>{
+          e.stopPropagation();
+          handle.setPointerCapture(e.pointerId);
+          spawning = true; spawnMoved = false;
+          const shell = wrap.querySelector('#mmCanvasShell');
+          const shellRect = shell.getBoundingClientRect();
+          const startX = e.clientX-shellRect.left+shell.scrollLeft, startY = e.clientY-shellRect.top+shell.scrollTop;
+          spawnLine = document.createElementNS('http://www.w3.org/2000/svg','line');
+          spawnLine.setAttribute('stroke','var(--blue)'); spawnLine.setAttribute('stroke-width','2.5'); spawnLine.setAttribute('stroke-dasharray','5,4');
+          spawnLine.setAttribute('x1', startX); spawnLine.setAttribute('y1', startY);
+          spawnLine.setAttribute('x2', startX); spawnLine.setAttribute('y2', startY);
+          svg.appendChild(spawnLine);
+        });
+        handle.addEventListener('pointermove', (e)=>{
+          if(!spawning) return;
+          spawnMoved = true;
+          const shell = wrap.querySelector('#mmCanvasShell');
+          const shellRect = shell.getBoundingClientRect();
+          const localX = e.clientX-shellRect.left+shell.scrollLeft, localY = e.clientY-shellRect.top+shell.scrollTop;
+          if(spawnLine){ spawnLine.setAttribute('x2', localX); spawnLine.setAttribute('y2', localY); }
+        });
+        ['pointerup','pointercancel'].forEach(evt=>{
+          handle.addEventListener(evt, ()=>{
+            if(!spawning) return;
+            spawning = false;
+            const endX = parseFloat(spawnLine?.getAttribute('x2')||0), endY = parseFloat(spawnLine?.getAttribute('y2')||0);
+            if(spawnLine) spawnLine.remove();
+            if(spawnMoved){
+              addChildTo(nodeId, {x: endX-offX, y: endY-offY});
+            }
+          });
+        });
+        canvasWrap.appendChild(handle);
       });
     });
     let dragMoved = false;
