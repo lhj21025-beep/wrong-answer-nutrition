@@ -1392,7 +1392,11 @@ function renderMindmap(root){
   const wrap = document.createElement('div');
   wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;min-height:0;';
   wrap.innerHTML = `<div class="row" style="padding:14px 20px 6px;gap:6px;flex-shrink:0;" id="mmTabs"></div>
-    <div style="padding:0 20px 6px;font-size:11px;color:rgba(var(--text-muted-rgb),0.4);flex-shrink:0;">💡 ＋버튼 또는 노드 가장자리에서 선을 그어 키워드 추가 · 노드 중앙을 드래그하면 이동</div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 20px 6px;flex-shrink:0;flex-wrap:wrap;">
+      <span style="font-size:11px;color:rgba(var(--text-muted-rgb),0.4);flex:1;min-width:180px;">💡 ＋버튼 또는 노드 가장자리에서 선을 그어 키워드 추가 · 노드 중앙을 드래그하면 이동</span>
+      <button class="btn ghost" id="mmAutoLayout" style="font-size:11.5px;padding:6px 12px;">🧭 위치 자동정렬</button>
+      <button class="btn ghost" id="mmRevertLayout" style="font-size:11.5px;padding:6px 12px;" disabled>↩ 이전 위치로</button>
+    </div>
     <div style="display:flex;gap:12px;padding:8px 20px 20px;flex:1;min-height:320px;">
       <div id="mmCanvasShell" style="flex:2;min-width:280px;background:var(--desk-2);border-radius:14px;overflow:auto;position:relative;">
         <div id="mmCanvas" style="position:relative;"></div>
@@ -1400,6 +1404,8 @@ function renderMindmap(root){
       <div id="mmPanel" style="flex:1;min-width:220px;max-width:320px;background:var(--desk-2);border-radius:14px;padding:14px 16px;overflow-y:auto;"></div>
     </div>`;
   root.appendChild(wrap);
+
+  // 자동정렬 이전 위치 백업은 root._layoutBackup에 저장 (클라우드 동기화됨)
 
   const existingSubjects = Object.keys(store.mindmaps);
   const tabsWrap = wrap.querySelector('#mmTabs');
@@ -1411,7 +1417,10 @@ function renderMindmap(root){
       const b = document.createElement('button');
       b.className = 'chip' + (s===currentSubject?' active':'');
       b.textContent = s;
-      b.addEventListener('click', ()=>{ currentSubject = s; buildTabs(); draw(); });
+      b.addEventListener('click', ()=>{
+        currentSubject = s; buildTabs(); draw();
+        wrap.querySelector('#mmRevertLayout').disabled = !store.mindmaps[currentSubject]?._layoutBackup;
+      });
       tabsWrap.appendChild(b);
     });
     const addSel = document.createElement('select');
@@ -1432,7 +1441,7 @@ function renderMindmap(root){
   function findParent(node,id,p=null){ if(node.id===id) return p; for(const c of node.children){ const f=findParent(c,id,node); if(f) return f; } return null; }
 
   const W=150, H=36;
-  const DEPTH_COLORS = ['#E8A33D','#3E6B9E','#4FC3C0','#7A5FA8','#C97A52','#6C9A5E'];
+  const DEPTH_COLORS = ['#E8A33D','#3E6B9E','#5B8C3A','#C24B3F','#7A5FA8','#2E9E97'];
   const NODE_COLOR_CHOICES = ['#E8A33D','#3E6B9E','#4FC3C0','#7A5FA8','#C97A52','#6C9A5E','#C24B3F','#2C3140'];
   function colorForNode(n){
     if(n.color) return n.color;
@@ -1458,6 +1467,45 @@ function renderMindmap(root){
   }
 
   function liveRoot(){ return store.mindmaps[currentSubject]; }
+
+  function snapshotPositions(root2){
+    const map = {};
+    (function walk(n){ map[n.id] = {x:n.x, y:n.y}; n.children.forEach(walk); })(root2);
+    return map;
+  }
+  function applyPositions(root2, map){
+    (function walk(n){ if(map[n.id]){ n.x=map[n.id].x; n.y=map[n.id].y; } n.children.forEach(walk); })(root2);
+  }
+  function autoLayoutTidy(root2){
+    const HSTEP=210, VSTEP=54;
+    let yc=0;
+    function layout(n, depth){
+      n.x = depth*HSTEP;
+      if(n.children.length===0){ n.y = yc*VSTEP; yc++; }
+      else { n.children.forEach(c=>layout(c, depth+1)); n.y = (n.children[0].y+n.children[n.children.length-1].y)/2; }
+    }
+    layout(root2, 0);
+  }
+  wrap.querySelector('#mmAutoLayout').addEventListener('click', ()=>{
+    if(!currentSubject) return;
+    const r = liveRoot();
+    r._layoutBackup = snapshotPositions(r);
+    autoLayoutTidy(r);
+    wrap.querySelector('#mmRevertLayout').disabled = false;
+    draw();
+    showToast('보기 좋은 위치로 정렬했어요');
+  });
+  wrap.querySelector('#mmRevertLayout').addEventListener('click', ()=>{
+    if(!currentSubject) return;
+    const r = liveRoot();
+    const backup = r._layoutBackup;
+    if(!backup) return;
+    applyPositions(r, backup);
+    delete r._layoutBackup;
+    wrap.querySelector('#mmRevertLayout').disabled = true;
+    draw();
+    showToast('이전 위치로 되돌렸어요');
+  });
 
   function addChildTo(parentId, pos){
     const pRoot = liveRoot();
@@ -1562,6 +1610,10 @@ function renderMindmap(root){
           if(dragMoved) return;
           mmSelectedId[currentSubject]=n.id; draw();
         });
+        const lvBadge = document.createElement('span');
+        lvBadge.textContent = 'L'+((n._depth||0)+1);
+        lvBadge.style.cssText = `position:absolute;left:${sx-4}px;top:${sy-8}px;font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:700;color:${bgColor};background:var(--desk);border:1px solid ${bgColor};border-radius:999px;padding:1px 5px;pointer-events:none;`;
+        canvasWrap.appendChild(lvBadge);
       }
       canvasWrap.appendChild(el);
 
@@ -1735,6 +1787,7 @@ function renderMindmap(root){
     const delBtn2 = panel.querySelector('#mmDel');
     if(delBtn2) delBtn2.addEventListener('click', ()=> deleteNode(selId));
   }
+  wrap.querySelector('#mmRevertLayout').disabled = !store.mindmaps[currentSubject]?._layoutBackup;
   draw();
 }
 
