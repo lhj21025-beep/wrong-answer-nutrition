@@ -1817,6 +1817,10 @@ function renderMindmap(root){
     canvasWrap.style.height = totalH+'px';
     canvasWrap.innerHTML = `<svg width="${totalW}" height="${totalH}" style="position:absolute;top:0;left:0;pointer-events:none;"></svg>`;
     const svg = canvasWrap.querySelector('svg');
+    canvasWrap.addEventListener('click', (e)=>{
+      if(e.target !== canvasWrap && e.target !== svg) return;
+      if(mmSelectedId[currentSubject]){ mmSelectedId[currentSubject] = null; draw(); }
+    });
 
     function edgePoints(px,py,cx,cy){
       const dx = cx-px, dy = cy-py;
@@ -1876,23 +1880,6 @@ function renderMindmap(root){
       canvasWrap.appendChild(el);
 
       const nodeId = n.id;
-      if(editingId !== n.id){
-        const addBtn = document.createElement('button');
-        addBtn.textContent = '＋';
-        addBtn.title = '자식 키워드 추가';
-        addBtn.style.cssText = `position:absolute;left:${sx+W-9}px;top:${sy+H-9}px;width:19px;height:19px;border-radius:50%;border:none;background:var(--blue);color:#fff;font-size:12px;cursor:pointer;line-height:19px;padding:0;`;
-        addBtn.addEventListener('click', (e)=>{ e.stopPropagation(); addChildTo(nodeId); });
-        canvasWrap.appendChild(addBtn);
-
-        if(n.id !== 'root'){
-          const delBtn = document.createElement('button');
-          delBtn.textContent = '×';
-          delBtn.title = '삭제';
-          delBtn.style.cssText = `position:absolute;left:${sx+W-9}px;top:${sy-9}px;width:18px;height:18px;border-radius:50%;border:none;background:var(--danger);color:#fff;font-size:11px;cursor:pointer;line-height:18px;padding:0;`;
-          delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); deleteNode(nodeId); });
-          canvasWrap.appendChild(delBtn);
-        }
-      }
 
       // ---------- 드래그: 노드 자체는 항상 "이동"만 ----------
       let dragging=false, sxStart=0, syStart=0, oxStart=0, oyStart=0;
@@ -1920,14 +1907,24 @@ function renderMindmap(root){
         });
       });
 
-      // ---------- 자식 만들기 전용 손잡이 4개 (노드 바깥 상하좌우) ----------
-      const HANDLE_R = 9;
-      const handlePositions = [
-        {dx: W/2, dy: -14},      // 위
-        {dx: W/2, dy: H+14},     // 아래
-        {dx: -14, dy: H/2},      // 왼쪽
-        {dx: W+14, dy: H/2},     // 오른쪽
-      ];
+      // ---------- 선택된 노드에만: 삭제 버튼 + 자식 만들기용 손잡이 4개 ----------
+      if(editingId !== n.id && sel){
+        if(n.id !== 'root'){
+          const delBtn = document.createElement('button');
+          delBtn.textContent = '×';
+          delBtn.title = '삭제';
+          delBtn.style.cssText = `position:absolute;left:${sx+W-9}px;top:${sy-9}px;width:18px;height:18px;border-radius:50%;border:none;background:var(--danger);color:#fff;font-size:11px;cursor:pointer;line-height:18px;padding:0;z-index:3;`;
+          delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); deleteNode(nodeId); });
+          canvasWrap.appendChild(delBtn);
+        }
+
+        const HANDLE_R = 9;
+        const handlePositions = [
+          {dx: W/2, dy: -14},      // 위
+          {dx: W/2, dy: H+14},     // 아래
+          {dx: -14, dy: H/2},      // 왼쪽
+          {dx: W+14, dy: H/2},     // 오른쪽
+        ];
       handlePositions.forEach(hp=>{
         const handle = document.createElement('div');
         handle.title = '드래그해서 자식 키워드 만들기';
@@ -1967,6 +1964,7 @@ function renderMindmap(root){
         });
         canvasWrap.appendChild(handle);
       });
+      }
     });
     let dragMoved = false;
 
