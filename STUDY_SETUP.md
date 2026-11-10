@@ -5,7 +5,7 @@
 - Firestore 규칙: https://console.firebase.google.com/project/wrong-answer-nutrition/firestore/rules
 - Storage 규칙: https://console.firebase.google.com/project/wrong-answer-nutrition/storage/rules
 
-**변경 내용:** 브라우저, Storage 규칙, Cloud Function 모두 한 파일당 50MiB(52,428,800바이트)로 설정했습니다. 서버는 대용량 파일을 Gemini Files API로 전송해 분석하기 때문에 50MB를 Base64로 담아 Callable 요청 제한을 넘기는 방식이 아닙니다. 긴 PDF를 한 번에 전사할 때는 출력 길이 제한으로 일부 페이지의 텍스트가 누락될 수 있으므로 중요한 자료는 나누어 등록하세요.
+**변경 내용:** 브라우저, Storage 규칙, Cloud Function 모두 한 파일당 50MB(50,000,000바이트)로 설정했습니다. 서버는 대용량 파일을 Gemini Files API로 전송해 분석하기 때문에 50MB를 Base64로 담아 Callable 요청 제한을 넘기는 방식이 아닙니다. 긴 PDF를 한 번에 전사할 때는 출력 길이 제한으로 일부 페이지의 텍스트가 누락될 수 있으므로 중요한 자료는 나누어 등록하세요.
 
 **중요:** 권한 오류를 해결하려고 `allow read, write: if true;` 등 전 사용자 공개 규칙을 사용하지 마세요. 반드시 로그인한 계정의 `uid`와 문서 경로의 `userId`를 비교해야 합니다.
 
@@ -56,7 +56,7 @@
     match /users/{userId}/studySources/{sourceId}/original {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == userId
-        && request.resource.size <= 50 * 1024 * 1024
+        && request.resource.size <= 50 * 1000 * 1000
         && (request.resource.contentType == 'application/pdf'
           || request.resource.contentType == 'image/jpeg'
           || request.resource.contentType == 'image/png'
