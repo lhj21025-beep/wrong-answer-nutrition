@@ -1,10 +1,25 @@
+# 2026-11-10 수정: 권한 오류 및 50MB 파일 제한
+
+화면에 `Missing or insufficient permissions`가 보이면, 로그인은 성공했더라도 Firestore에서 `studySources` 또는 `studyWrong`의 읽기 요청이 거부된 것입니다. **GitHub 코드를 바꾸는 것만으로 보안 규칙이 바뀌지 않습니다.** 현재 Firebase 콘솔에 있는 기존 규칙을 보존한 채 아래 규칙을 추가하고 **게시**해야 합니다.
+
+- Firestore 규칙: https://console.firebase.google.com/project/wrong-answer-nutrition/firestore/rules
+- Storage 규칙: https://console.firebase.google.com/project/wrong-answer-nutrition/storage/rules
+
+**변경 내용:** 브라우저, Storage 규칙, Cloud Function 모두 한 파일당 50MiB(52,428,800바이트)로 설정했습니다. 서버는 대용량 파일을 Gemini Files API로 전송해 분석하기 때문에 50MB를 Base64로 담아 Callable 요청 제한을 넘기는 방식이 아닙니다. 긴 PDF를 한 번에 전사할 때는 출력 길이 제한으로 일부 페이지의 텍스트가 누락될 수 있으므로 중요한 자료는 나누어 등록하세요.
+
+**중요:** 권한 오류를 해결하려고 `allow read, write: if true;` 등 전 사용자 공개 규칙을 사용하지 마세요. 반드시 로그인한 계정의 `uid`와 문서 경로의 `userId`를 비교해야 합니다.
+
+배포 방법: 규칙은 Firebase 콘솔에서 각각 게시하고, 신규 Cloud Functions는 이 문서 아래의 CLI 안내에 따라 별도 배포합니다. 현재 GitHub 수정만으로 신규 함수가 자동 배포되는 것은 아닙니다.
+
+---
+
 # 영양교사 AI 학습 기능 배포 및 테스트
 
 기존 index.html, 사용자 데이터(users/{uid}/data/*)를 유지한 채 study.html을 추가했습니다.
 
 ## 기능
 - 기존 Firebase 이메일 계정으로 로그인
-- Firebase Storage에 PDF/JPG/PNG/WEBP 원본 보관(파일당 최대 10MB)
+- Firebase Storage에 PDF/JPG/PNG/WEBP 원본 보관(파일당 최대 50MB)
 - Firestore에 파일 정보, 추출 텍스트, AI 질문/답안 기록과 오답을 보관
 - 다중파일 선택, 카드/주관식 선택, 개수 5/10(기본)/15/20/30
 - 음성 녹음 → Gemini 전사 → 텍스트 확인·수정 → 주관식 AI 채점
@@ -41,7 +56,7 @@
     match /users/{userId}/studySources/{sourceId}/original {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == userId
-        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.size <= 50 * 1024 * 1024
         && (request.resource.contentType == 'application/pdf'
           || request.resource.contentType == 'image/jpeg'
           || request.resource.contentType == 'image/png'
