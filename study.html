@@ -193,6 +193,7 @@ async function uploadFiles(files){
    const result=await call("processStudySource",{sourceId:ref.id});
    notice(file.name+": 분석 완료("+result.charCount+"자)"+(result.warning?" · "+result.warning:""));
    chosen.add(ref.id);
+   drawSources();
   }catch(e){
    try{await ref.set({status:"error",error:e.message||String(e)},{merge:true});}catch(_){}
    err(e);
