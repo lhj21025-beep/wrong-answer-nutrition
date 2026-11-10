@@ -111,6 +111,7 @@
   <span class="sub" id="topSub">영양교사 임용시험 학습 앱</span>
   <button id="textSizeToggle" title="글자 크게 보기" style="background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:12px;font-weight:700;flex-shrink:0;margin-left:auto;">Aa</button>
   <button id="themeToggle" style="background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;flex-shrink:0;">🌙</button>
+  <a href="./study.html" title="PDF·이미지 AI 학습" style="flex-shrink:0;color:var(--amber);font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap;">AI 학습</a>
   <button id="refreshTopBtn" title="최신 데이터 새로고침" style="display:none;background:rgba(var(--border-rgb),0.08);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:13px;flex-shrink:0;">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
   </button>
@@ -160,7 +161,8 @@ if(FIREBASE_ENABLED){
 }
 
 /* ============================== STORE ============================== */
-const TODAY = new Date('2026-08-08');
+const TODAY_STR = new Date(Date.now()+9*3600000).toISOString().slice(0,10);
+const TODAY = new Date(TODAY_STR);
 const SUBJECTS = ['고급영양학+생화학','식품학','조리원리','영양교육 및 상담','영양판정','식사요법','단체급식','생애주기 영양학','식품위생학','교육학'].sort((a,b)=>a.localeCompare(b,'ko'));
 const SUBJECT_COLORS = {
   '고급영양학+생화학':'#5B6BA8','식품학':'#C97A52','조리원리':'#B4552F','영양교육 및 상담':'#7A5FA8',
@@ -610,8 +612,8 @@ function openReviewSession(dueNotes){
       realNote.wrongCount = (realNote.wrongCount||0) + 1;
       wrongCount++;
     }
-    realNote.lastReviewedAt = '2026-08-08';
-    realNote.nextReviewAt = addDays('2026-08-08', REVIEW_INTERVALS[realNote.masteryLevel]);
+    realNote.lastReviewedAt = TODAY_STR;
+    realNote.nextReviewAt = addDays(TODAY_STR, REVIEW_INTERVALS[realNote.masteryLevel]);
     idx++;
     draw();
   }
@@ -1440,7 +1442,7 @@ function renderNotesCapture(root){
       wrongReason: wrap.querySelector('#cWrongReason').value || '(미입력)',
       correctConcept: wrap.querySelector('#cConcept').value || '(미입력)',
       handwritingText: wrap.querySelector('#cHandwritingText').value || '',
-      source:'직접 등록', createdAt:'2026-08-08', nextReviewAt:'2026-08-09', masteryLevel:0, reviewCount:0, correctCount:0, wrongCount:0, favorite:false, collectionIds:[], images: capturedImages.slice(),
+      source:'직접 등록', createdAt:TODAY_STR, nextReviewAt:addDays(TODAY_STR,1), masteryLevel:0, reviewCount:0, correctCount:0, wrongCount:0, favorite:false, collectionIds:[], images: capturedImages.slice(),
     };
     store.notes.push(note);
     showToast('오답노트가 저장되었습니다');
@@ -2292,7 +2294,7 @@ function renderExport(root){
     const blob = new Blob([data], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `오답노트백업_2026-08-08.json`;
+    a.href = url; a.download = `오답노트백업_${TODAY_STR}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
     showToast('백업 파일이 다운로드되었습니다');
@@ -2427,7 +2429,7 @@ function renderExport(root){
         }
       }
     }
-    doc.save('학습자료_2026-08-08.pdf');
+    doc.save('학습자료_'+TODAY_STR+'.pdf');
     genBtn.disabled = false; genBtn.textContent = originalLabel;
   });
 }
