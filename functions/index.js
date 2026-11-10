@@ -50,18 +50,73 @@ function itemClean(x,sources){
   return {sourceId:src.id,sourceName:src.name,question:str(q,500),answer:str(a,1400),
     explanation:str(x.explanation,1500),evidence:e};
 }
-exports.processStudySource=onCall({region:REGION,secrets:[key],timeoutSeconds:180,memory:"1GiB"},async(r)=>{
+const SOURCE_SIZE_LIMIT=50*1024*1024;
+// Upload to Gemini Files API rather than embedding base64 in generateContent.
+// Firebase Storage remains the durable copy; the Gemini-side upload is temporary.
+async function stageGeminiFile(buffer,mime,displayName){
+  const apiKey=key.value();
+  if(!apiKey)throw new HttpsError("failed-precondition","GEMINI_API_KEY 설정이 없습니다.");
+  let started,uploaded;
+  try{
+    started=await fetch("https://generativelanguage.googleapis.com/upload/v1beta/files",{
+      method:"POST",signal:AbortSignal.timeout(30000),
+      headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json",
+        "X-Goog-Upload-Protocol":"resumable","X-Goog-Upload-Command":"start",
+        "X-Goog-Upload-Header-Content-Length":String(buffer.length),
+        "X-Goog-Upload-Header-Content-Type":mime},
+      body:JSON.stringify({file:{displayName:str(displayName,120)}})
+    });
+    if(!started.ok)throw new Error("Files API 업로드 시작 실패("+started.status+")");
+    const uploadUrl=started.headers.get("x-goog-upload-url");
+    if(!uploadUrl||!uploadUrl.startsWith("https://"))throw new Error("Files API 업로드 URL 누락");
+    const response=await fetch(uploadUrl,{
+      method:"POST",signal:AbortSignal.timeout(120000),
+      headers:{"Content-Type":mime,"X-Goog-Upload-Offset":"0","X-Goog-Upload-Command":"upload, finalize"},
+      body:buffer
+    });
+    if(!response.ok)throw new Error("Files API 파일 전송 실패("+response.status+")");
+    uploaded=(await response.json()).file;
+    if(!uploaded?.uri||!uploaded?.name)throw new Error("Files API 파일 URI 누락");
+    for(let attempt=0;attempt<22 && uploaded.state==="PROCESSING";attempt++){
+      await new Promise(resolve=>setTimeout(resolve,1800));
+      const check=await fetch("https://generativelanguage.googleapis.com/v1beta/"+uploaded.name,{
+        headers:{"x-goog-api-key":apiKey},signal:AbortSignal.timeout(10000)
+      });
+      if(!check.ok)throw new Error("Files API 파일 상태 확인 실패("+check.status+")");
+      uploaded=await check.json();
+    }
+    if(uploaded.state==="FAILED")throw new Error("Gemini 문서 분석 준비 실패");
+    if(uploaded.state==="PROCESSING")throw new Error("Gemini 문서 준비 지연: 잠시 후 다시 시도하세요.");
+    return {uri:uploaded.uri,name:uploaded.name};
+  }catch(e){
+    if(uploaded?.name)await removeGeminiFile(uploaded.name);
+    throw e instanceof HttpsError?e:new HttpsError("unavailable","50MB 파일 전송 오류: "+e.message);
+  }
+}
+async function removeGeminiFile(name){
+  if(!/^files\/[a-zA-Z0-9_-]+$/.test(String(name||"")))return;
+  try{
+    await fetch("https://generativelanguage.googleapis.com/v1beta/"+name,{
+      method:"DELETE",headers:{"x-goog-api-key":key.value()},signal:AbortSignal.timeout(10000)
+    });
+  }catch(e){console.warn("Temporary Gemini file deletion deferred",e.message);}
+}
+exports.processStudySource=onCall({region:REGION,secrets:[key],timeoutSeconds:300,memory:"1GiB"},async(r)=>{
   const uid=user(r),s=id(r.data?.sourceId),doc=ref(uid,s);
   if(!(await doc.get()).exists)throw new HttpsError("not-found","파일 정보가 없습니다.");
   const file=bucket.file(path(uid,s));
   try{
     const [meta]=await file.getMetadata(),mime=String(meta.contentType||"").split(";")[0];
-    if(!["application/pdf","image/jpeg","image/png","image/webp"].includes(mime)||Number(meta.size)>10*1024*1024)
-      throw new HttpsError("invalid-argument","PDF·JPG·PNG·WEBP 10MB 이하만 지원합니다.");
+    if(!["application/pdf","image/jpeg","image/png","image/webp"].includes(mime)||Number(meta.size)>SOURCE_SIZE_LIMIT)
+      throw new HttpsError("invalid-argument","PDF·JPG·PNG·WEBP 50MB 이하만 지원합니다.");
     await doc.set({status:"processing",error:null},{merge:true});
     const [buf]=await file.download();
-    const output=await ask([{text:"이 한국어 학습자료 PDF/이미지의 모든 보이는 글자, 표, 필기를 가능한 한 원문 그대로 추출하라. 외부 정보나 임의 해설 추가 금지. 읽을 수 없는 곳은 [판독 불가]로 표시. 가능하면 페이지마다 [페이지] 표시. 전사 텍스트만 반환."},
-      {inlineData:{mimeType:mime,data:buf.toString("base64")}}],{max:16000,temp:0});
+    const staged=await stageGeminiFile(buf,mime,(await doc.get()).data()?.name||s);
+    let output;
+    try{
+      output=await ask([{text:"이 한국어 학습자료 PDF/이미지의 모든 보이는 글자, 표, 필기를 가능한 한 원문 그대로 추출하라. 외부 정보나 임의 해설 추가 금지. 읽을 수 없는 곳은 [판독 불가]로 표시. 가능하면 페이지마다 [페이지] 표시. 전사 텍스트만 반환."},
+        {fileData:{mimeType:mime,fileUri:staged.uri}}],{max:16000,temp:0});
+    }finally{await removeGeminiFile(staged.name);}
     if(output.length<20)throw new HttpsError("failed-precondition","읽을 수 있는 내용이 부족합니다.");
     const prev=await doc.collection("parts").get();
     for(let i=0;i<prev.size;i+=400){const b=db.batch();prev.docs.slice(i,i+400).forEach(d=>b.delete(d.ref));await b.commit();}
