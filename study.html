@@ -191,7 +191,7 @@ async function uploadFiles(files){
   if(!["application/pdf","image/jpeg","image/png","image/webp"].includes(mime)){
    notice(file.name+": PDF/JPG/PNG/WEBP만 지원됩니다.",true);continue;
   }
-  if(file.size>50*1024*1024){notice(file.name+": 50MB를 초과했습니다.",true);continue;}
+  if(file.size>50*1000*1000){notice(file.name+": 50MB를 초과했습니다.",true);continue;}
   const ref=sourceCollection().doc(),path="users/"+uid+"/studySources/"+ref.id+"/original";
   try{
    await ref.set({name:file.name,size:file.size,mime,path,status:"uploading",createdAt:firebase.firestore.FieldValue.serverTimestamp()});
