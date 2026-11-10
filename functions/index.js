@@ -6,7 +6,7 @@ const admin=require("firebase-admin");
 const crypto=require("node:crypto");
 if(!admin.apps.length)admin.initializeApp();
 const db=admin.firestore(),bucket=admin.storage().bucket(),key=defineSecret("GEMINI_API_KEY");
-const MODEL=process.env.GEMINI_MODEL||"gemini-2.5-flash",REGION="us-central1";
+const MODEL=process.env.GEMINI_MODEL||"gemini-3.8-flash",REGION="us-central1";
 function user(r){if(!r.auth?.uid)throw new HttpsError("unauthenticated","로그인이 필요합니다.");return r.auth.uid;}
 function id(x){let s=String(x||"");if(!/^[\w-]{8,100}$/.test(s))throw new HttpsError("invalid-argument","자료 ID 오류");return s;}
 function ref(uid,s){return db.doc("users/"+uid+"/studySources/"+id(s));}
