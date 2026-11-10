@@ -98,8 +98,13 @@ exports.transcribeStudyAudio=onCall({region:REGION,secrets:[key],timeoutSeconds:
 function wrongKey(i){return id(i.sourceId)+"_"+crypto.createHash("sha256").update(norm(i.question)).digest("hex").slice(0,24);}
 async function validate(uid,x){
   if(!x?.sourceId||!x.question||!x.answer||!x.evidence)throw new HttpsError("invalid-argument","문제 데이터 오류");
-  const d=await ref(uid,x.sourceId).get();if(!d.exists)throw new HttpsError("not-found","원본 자료가 없습니다.");
-  return {sourceId:id(x.sourceId),sourceName:str(d.data().name,150),question:str(x.question,500),
+  const d=await ref(uid,x.sourceId).get();
+  if(!d.exists){
+    const saved=await db.doc("users/"+uid+"/studyWrong/"+wrongKey(x)).get();
+    if(!saved.exists||norm(saved.data().item?.question)!==norm(x.question))throw new HttpsError("not-found","원본 자료가 없습니다.");
+    x=saved.data().item;
+  }
+  return {sourceId:id(x.sourceId),sourceName:str(d.exists?d.data().name:x.sourceName,150),question:str(x.question,500),
     answer:str(x.answer,1400),explanation:str(x.explanation,1500),evidence:str(x.evidence,280)};
 }
 async function legacy(uid,i,answer,feedback){
