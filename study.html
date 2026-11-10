@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>영양교사 AI 학습 · 오답노트</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<style>
+:root{font-family:system-ui,"Noto Sans KR",sans-serif;color-scheme:dark;--bg:#1e212b;--panel:#2c3140;--line:#414957;--ink:#f8f5ee;--muted:#b5bfca;--gold:#e8a33d;--blue:#8bbbea}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);min-height:100%;font-size:15px}
+header{position:sticky;top:0;background:#242834;z-index:2;display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+header strong{font-size:16px;flex:1}a{color:var(--blue);text-decoration:none;font-size:13px}main{max-width:800px;margin:auto;padding:15px 15px 100px}
+section,.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:17px;margin-bottom:14px}
+h1,h2{margin:0 0 10px}h2{font-size:17px}.hint{color:var(--muted);font-size:12px;line-height:1.6}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.spread{justify-content:space-between}
+button,input,textarea,select{font:inherit}button{border:0;background:#434f60;color:var(--ink);padding:10px 15px;border-radius:9px;cursor:pointer}
+button.primary{background:var(--gold);color:#241705;font-weight:700}
+button.small{font-size:12px;padding:6px 9px}button:disabled{opacity:.45;cursor:not-allowed}
+input[type=email],input[type=password],select,textarea,input[type=number]{border:1px solid #596473;border-radius:9px;background:#232733;color:var(--ink);padding:11px}
+input[type=email],input[type=password],textarea{width:100%}textarea{resize:vertical;min-height:110px;line-height:1.5}
+label{cursor:pointer}.upload{display:block;padding:15px;border:1px dashed #8a949f;border-radius:12px;text-align:center;background:#303847;margin:10px 0;color:var(--blue);font-weight:700}
+.file-row{display:flex;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid #46505d}.file-row:last-child{border:0}
+.file-body{flex:1;min-width:0}.file-name{overflow-wrap:anywhere;font-weight:650;font-size:13px}.status{font-size:12px;color:var(--muted);margin-top:4px}
+.pill{display:inline-block;padding:3px 8px;border-radius:15px;font-size:11px;background:#45566a}
+.error{color:#ffb6a3}.success{color:#a3e5c9}.highlight{color:var(--gold)}
+.choice{display:flex;align-items:center;gap:7px}.choice input{accent-color:var(--gold)}
+.block{margin:12px 0}.question{white-space:pre-wrap;font-size:19px;font-weight:750;line-height:1.65;margin:16px 0}
+.answer{white-space:pre-wrap;line-height:1.75;background:#222938;padding:14px;border-radius:10px;margin:10px 0}
+#studyFeedback{white-space:pre-wrap;line-height:1.65}
+#notice{position:sticky;top:54px;z-index:3;background:#3b424f;max-width:800px;margin:auto;border-radius:0 0 8px 8px;padding:10px 14px;font-size:13px;display:none}
+#loginView{max-width:420px;margin:45px auto;padding:15px}#loginView .block{margin-bottom:10px}
+.mini-counter{font-size:13px;color:var(--blue);font-weight:650}#voiceText{color:var(--muted);font-size:12px}
+[hidden]{display:none!important}
+@media(max-width:540px){header{padding:12px}header strong{font-size:14px}main{padding:10px 10px 110px}section{padding:14px}button{padding:10px}h2{font-size:16px}}
+</style>
+</head>
+<body>
+<header>
+ <a href="./index.html">← 기존 오답노트</a>
+ <strong>AI 학습 · 영양교사</strong>
+ <button id="logout" class="small" hidden>로그아웃</button>
+</header>
+<div id="notice" role="status" aria-live="polite"></div>
+<div id="loginView">
+ <section><h2>Firebase 로그인</h2><p class="hint">기존 오답노트와 같은 계정으로 로그인하세요.</p>
+  <div class="block"><input id="email" type="email" autocomplete="username" placeholder="이메일"></div>
+  <div class="block"><input id="password" type="password" autocomplete="current-password" placeholder="비밀번호"></div>
+  <div class="row"><button id="signIn" class="primary">로그인</button><button id="signUp">새 계정 만들기</button></div>
+ </section>
+</div>
+<main id="app" hidden>
+<section>
+ <div class="row spread"><h2>1. 학습자료 보관함</h2><span id="fileCount" class="mini-counter"></span></div>
+ <p class="hint">PDF·JPG·PNG·WEBP 파일을 여러 개 저장합니다. 한 파일당 최대 10MB. 서버에서 원문을 읽은 뒤 카드와 문제를 생성합니다.</p>
+ <label class="upload" for="fileInput">+ PDF / 이미지 파일 등록</label>
+ <input id="fileInput" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" multiple hidden>
+ <div class="row"><button id="selectAll" class="small">완료된 파일 모두 선택</button><button id="clearAll" class="small">선택 해제</button><span id="selectedCount" class="hint"></span></div>
+ <div id="files" class="block"></div>
+</section>
+<section>
+ <h2>2. 카드·문제 출제</h2>
+ <p class="hint">선택한 파일만 AI에 전달합니다. 답과 설명에 원문 근거를 표시합니다. 원문으로 확인할 수 없는 질문은 제외됩니다.</p>
+ <div class="row block">
+  <label>종류
+   <select id="kind"><option value="card">뒤집기 카드</option><option value="question">주관식 문제</option></select>
+  </label>
+  <label>개수
+   <select id="count"><option>5</option><option selected>10</option><option>15</option><option>20</option><option>30</option></select>
+  </label>
+  <button id="generate" class="primary">선택한 파일로 출제</button>
+ </div>
+ <div id="generationNote" class="hint"></div>
+</section>
+<section>
+ <div class="row spread"><h2>3. 내 오답 재시험</h2><span id="wrongCount" class="mini-counter">0개</span></div>
+ <p class="hint">주관식 오답·부분정답 및 외우지 못한 카드를 자동 저장합니다. 정답을 맞히면 복습 완료로 표시합니다.</p>
+ <button id="retryWrong">오답만 다시 풀기</button>
+ <button id="showWrong" class="small">오답 목록 보기</button>
+ <div id="wrongList" hidden></div>
+</section>
+<section id="study" hidden>
+ <div class="row spread"><h2 id="studyTitle">학습</h2><button id="closeStudy" class="small">종료</button></div>
+ <p id="progress" class="hint"></p>
+ <div id="studyQuestion" class="question"></div>
+ <div id="cardArea" hidden>
+  <button id="flip" class="primary">정답 뒤집기</button>
+  <div id="back" hidden><div id="cardAnswer" class="answer"></div><div class="row"><button id="cardKnown" class="primary">알고 있었음</button><button id="cardUnknown">몰랐음 · 오답 저장</button></div></div>
+ </div>
+ <div id="questionArea" hidden>
+  <textarea id="userAnswer" placeholder="답안을 적거나 녹음한 뒤, 인식된 내용을 확인·수정하세요."></textarea>
+  <div class="row block">
+   <button id="startMic">● 녹음 시작</button><button id="stopMic" disabled>■ 녹음 종료</button>
+   <span id="voiceText">음성 답변을 텍스트로 변환합니다.</span>
+  </div>
+  <button id="grade" class="primary">AI 채점 및 피드백</button>
+ </div>
+ <div id="studyFeedback" class="block" hidden></div>
+ <button id="next" class="primary" hidden>다음</button>
+</section>
+</main>
+<script>
+"use strict";
+const config={
+ apiKey:"AIzaSyD3Ok2um7PVdWzKGIN0GftaGsvamRxgusc",
+ authDomain:"wrong-answer-nutrition.firebaseapp.com",
+ projectId:"wrong-answer-nutrition",
+ storageBucket:"wrong-answer-nutrition.firebasestorage.app",
+ messagingSenderId:"510157450623",
+ appId:"1:510157450623:web:5e3eb6c930f986e10e3e4a"
+};
+firebase.initializeApp(config);
+const auth=firebase.auth(),db=firebase.firestore(),functions=firebase.app().functions("us-central1"),storage=firebase.storage();
+const $=id=>document.getElementById(id);
+let uid=null,unsubSources=null,unsubWrong=null,sources=[],wrongItems=[],chosen=new Set();
+let session=[],position=0,sessionKind="card",sessionCorrect=0,sessionWrong=0,recording=null,recordChunks=[],audioStream=null;
+function text(el,v){$(el).textContent=v;}
+function notice(v,bad=false){const n=$("notice");n.style.display="block";n.className=bad?"error":"";n.textContent=v;}
+function clearNotice(){$("notice").style.display="none";}
+function call(name,data){return functions.httpsCallable(name)(data).then(x=>x.data);}
+function err(e){const s=e?.message||String(e);notice(s,true);}
+function elem(tag,cls,content){
+ const x=document.createElement(tag);if(cls)x.className=cls;
+ if(content!=null)x.textContent=content;return x;
+}
+function sourceCollection(){return db.collection("users").doc(uid).collection("studySources");}
+function wrongCollection(){return db.collection("users").doc(uid).collection("studyWrong");}
+function setBusy(el,busy,busyText){
+ if(busy){el.dataset.oldText=el.textContent;el.textContent=busyText||"처리 중...";}
+ else{el.textContent=el.dataset.oldText||el.textContent;}
+ el.disabled=busy;
+}
+function statusName(s){return {uploading:"업로드 중",processing:"AI 원문 분석 중",ready:"분석 완료",error:"분석 오류"}[s]||s;}
+function drawSources(){
+ const area=$("files");area.replaceChildren();
+ text("fileCount",sources.length+"개 보관");
+ text("selectedCount","선택 "+chosen.size+"개");
+ if(!sources.length){area.appendChild(elem("p","hint","등록된 자료가 없습니다."));return;}
+ sources.forEach(s=>{
+  const row=elem("div","file-row");
+  const cb=elem("input");cb.type="checkbox";cb.checked=chosen.has(s.id);
+  cb.disabled=s.status!=="ready";cb.setAttribute("aria-label",s.name+" 선택");
+  cb.addEventListener("change",()=>{cb.checked?chosen.add(s.id):chosen.delete(s.id);text("selectedCount","선택 "+chosen.size+"개");});
+  const body=elem("div","file-body");
+  body.appendChild(elem("div","file-name",s.name));
+  let label=statusName(s.status)+" · "+Math.round((s.size||0)/1024)+"KB";
+  if(s.charCount)label+=" · 추출 "+s.charCount.toLocaleString()+"자";
+  body.appendChild(elem("div","status",label));
+  if(s.warning)body.appendChild(elem("div","status highlight",s.warning));
+  if(s.error)body.appendChild(elem("div","status error",s.error));
+  const actions=elem("div");
+  if(s.status==="error"||s.status==="uploading"){
+   const retry=elem("button","small","재분석");actions.appendChild(retry);
+   retry.addEventListener("click",async()=>{setBusy(retry,true,"분석 중");try{await call("processStudySource",{sourceId:s.id});notice(s.name+" 분석 완료");}catch(e){err(e);}finally{setBusy(retry,false);}});
+  }
+  const del=elem("button","small","삭제");actions.appendChild(del);
+  del.addEventListener("click",async()=>{
+   if(!confirm("원본 파일과 추출 내용을 삭제할까요? 기존 학습 오답 기록은 남습니다."))return;
+   setBusy(del,true,"삭제 중");
+   try{await call("deleteStudySource",{sourceId:s.id});chosen.delete(s.id);notice("자료를 삭제했습니다.");}
+   catch(e){err(e);setBusy(del,false);}
+  });
+  row.append(cb,body,actions);area.appendChild(row);
+ });
+}
+function drawWrong(){
+ const pending=wrongItems.filter(x=>!x.mastered);
+ text("wrongCount",pending.length+"개");
+ const box=$("wrongList");box.replaceChildren();
+ pending.forEach(x=>{
+  const d=elem("div","file-row"),p=elem("div","file-body");
+  p.append(elem("div","file-name",x.item?.question||"문제"),elem("div","status",x.item?.sourceName||""));
+  d.append(p);box.append(d);
+ });
+ if(!pending.length)box.appendChild(elem("p","hint","복습할 오답이 없습니다."));
+}
+async function uploadFiles(files){
+ for(const file of files){
+  const mime=(file.type||"").split(";")[0]||(file.name.toLowerCase().endsWith(".pdf")?"application/pdf":"");
+  if(!["application/pdf","image/jpeg","image/png","image/webp"].includes(mime)){
+   notice(file.name+": PDF/JPG/PNG/WEBP만 지원됩니다.",true);continue;
+  }
+  if(file.size>10*1024*1024){notice(file.name+": 10MB를 초과했습니다.",true);continue;}
+  const ref=sourceCollection().doc(),path="users/"+uid+"/studySources/"+ref.id+"/original";
+  try{
+   await ref.set({name:file.name,size:file.size,mime,path,status:"uploading",createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+   notice(file.name+": 업로드 중");
+   await storage.ref(path).put(file,{contentType:mime});
+   notice(file.name+": AI 원문 분석 중");
+   const result=await call("processStudySource",{sourceId:ref.id});
+   notice(file.name+": 분석 완료("+result.charCount+"자)"+(result.warning?" · "+result.warning:""));
+   chosen.add(ref.id);
+  }catch(e){
+   try{await ref.set({status:"error",error:e.message||String(e)},{merge:true});}catch(_){}
+   err(e);
+  }
+ }
+}
+function startSession(items,kind,title){
+ if(!items.length){notice("출제할 문제가 없습니다.",true);return;}
+ if(recording)stopRecording();
+ session=items;position=0;sessionKind=kind;sessionCorrect=0;sessionWrong=0;
+ text("studyTitle",title);
+ $("study").hidden=false;
+ drawQuestion();
+ $("study").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function drawQuestion(){
+ const i=session[position];
+ if(!i){finish();return;}
+ text("progress",(position+1)+" / "+session.length);
+ text("studyQuestion",i.question+"  ("+i.sourceName+")");
+ $("studyFeedback").hidden=true;$("next").hidden=true;
+ $("back").hidden=true;$("flip").hidden=false;
+ $("cardArea").hidden=sessionKind!=="card";$("questionArea").hidden=sessionKind!=="question";
+ $("userAnswer").value="";$("grade").disabled=false;
+ $("startMic").disabled=false;$("stopMic").disabled=true;text("voiceText","녹음 후 텍스트를 확인·수정하세요.");
+}
+function feedbackHTML(verdict,detail,missing,item,answer){
+ const p=$("studyFeedback");p.replaceChildren();p.hidden=false;
+ const label=verdict==="correct"?"정답":verdict==="partial"?"부분정답":"오답";
+ p.appendChild(elem("h2",verdict==="correct"?"success":"highlight",label));
+ if(answer)p.appendChild(elem("div","hint","제출 답안: "+answer));
+ p.appendChild(elem("div","answer","모범답안: "+item.answer));
+ if(detail)p.appendChild(elem("div","answer",detail));
+ if(missing)p.appendChild(elem("div","hint","보충: "+missing));
+ p.appendChild(elem("div","hint","출처: "+item.sourceName));
+ p.appendChild(elem("div","answer","원문 근거: "+item.evidence));
+}
+function finish(){
+ $("cardArea").hidden=true;$("questionArea").hidden=true;$("next").hidden=true;
+ text("studyQuestion","학습 완료");
+ text("progress","총 "+session.length+"개 · 정답/암기 완료 "+sessionCorrect+"개 · 오답/부분정답 "+sessionWrong+"개");
+ const box=$("studyFeedback");box.hidden=false;box.replaceChildren();
+ box.appendChild(elem("p","hint","틀린 문제는 오답 목록에 자동 저장됩니다. 오답만 재시험할 수 있습니다."));
+}
+function advance(){position++;drawQuestion();}
+async function submitResult(name,payload,button,waiting){
+ const item=session[position];setBusy(button,true,waiting);
+ try{
+  const data=await call(name,{item,...payload});
+  if(data.verdict==="correct")sessionCorrect++;else sessionWrong++;
+  feedbackHTML(data.verdict,data.feedback||"",data.missing||"",item,payload.answer||"");
+  if(data.legacySynced===false)notice("신규 오답목록에는 저장됐지만 기존 오답노트 동기화는 실패했습니다.",true);
+  $("grade").disabled=true;$("cardKnown").disabled=true;$("cardUnknown").disabled=true;
+  $("next").hidden=false;
+ }catch(e){err(e);}
+ finally{setBusy(button,false);}
+}
+function stopRecording(){
+ if(recording&&recording.state!=="inactive")recording.stop();
+ $("stopMic").disabled=true;$("startMic").disabled=false;
+}
+async function startRecording(){
+ if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==="undefined"){
+  notice("이 기기/브라우저에서는 마이크 녹음이 지원되지 않습니다.",true);return;
+ }
+ try{
+  audioStream=await navigator.mediaDevices.getUserMedia({audio:true});
+  const mime=["audio/webm;codecs=opus","audio/mp4","audio/webm","audio/ogg"].find(x=>MediaRecorder.isTypeSupported(x));
+  if(!mime){notice("지원되는 녹음 형식이 없습니다.",true);audioStream.getTracks().forEach(x=>x.stop());return;}
+  const chunks=[];recordChunks=chunks;recording=new MediaRecorder(audioStream,{mimeType:mime});
+  const onQuestion=position;
+  recording.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+  recording.onstop=async()=>{
+   audioStream.getTracks().forEach(x=>x.stop());audioStream=null;
+   if(onQuestion!==position)return;
+   const blob=new Blob(chunks,{type:mime});
+   if(blob.size>5*1024*1024){notice("녹음이 5MB를 초과했습니다. 짧게 다시 녹음하세요.",true);return;}
+   text("voiceText","AI 음성 인식 중...");
+   try{
+    const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(blob);});
+    const result=await call("transcribeStudyAudio",{mime:mime.split(";")[0],base64:dataUrl.split(",")[1]});
+    $("userAnswer").value=result.transcript;
+    text("voiceText","변환 완료 · 내용 확인 및 수정 후 채점");
+   }catch(e){text("voiceText","인식 실패");err(e);}
+  };
+  recording.start();$("startMic").disabled=true;$("stopMic").disabled=false;
+  text("voiceText","녹음 중... 종료 버튼을 눌러 전사하세요.");
+ }catch(e){err(e);}
+}
+$("signIn").addEventListener("click",()=>auth.signInWithEmailAndPassword($("email").value.trim(),$("password").value).catch(err));
+$("signUp").addEventListener("click",()=>auth.createUserWithEmailAndPassword($("email").value.trim(),$("password").value).catch(err));
+$("logout").addEventListener("click",()=>auth.signOut());
+auth.onAuthStateChanged(u=>{
+ if(unsubSources)unsubSources();if(unsubWrong)unsubWrong();
+ uid=u?.uid||null;
+ $("app").hidden=!u;$("loginView").hidden=!!u;$("logout").hidden=!u;
+ chosen=new Set();sources=[];wrongItems=[];
+ if(!u)return;
+ unsubSources=sourceCollection().orderBy("createdAt","desc").onSnapshot(snap=>{
+  sources=snap.docs.map(d=>({id:d.id,...d.data()}));
+  chosen=new Set([...chosen].filter(x=>sources.some(s=>s.id===x)));
+  drawSources();
+ },err);
+ unsubWrong=wrongCollection().onSnapshot(snap=>{wrongItems=snap.docs.map(d=>({id:d.id,...d.data()}));drawWrong();},err);
+});
+$("fileInput").addEventListener("change",async e=>{const files=Array.from(e.target.files);e.target.value="";await uploadFiles(files);});
+$("selectAll").addEventListener("click",()=>{sources.filter(x=>x.status==="ready").forEach(x=>chosen.add(x.id));drawSources();});
+$("clearAll").addEventListener("click",()=>{chosen.clear();drawSources();});
+$("generate").addEventListener("click",async()=>{
+ const ids=[...chosen].filter(i=>sources.find(x=>x.id===i)?.status==="ready");
+ if(!ids.length){notice("분석 완료된 파일을 하나 이상 선택하세요.",true);return;}
+ const btn=$("generate");setBusy(btn,true,"AI 출제 중...");
+ try{
+  const result=await call("generateStudyItems",{sourceIds:ids,count:Number($("count").value),kind:$("kind").value});
+  text("generationNote",result.requested+"개 요청, 원문 확인 "+result.returned+"개 생성");
+  if(result.returned<result.requested)notice("원문과 대조 가능한 문제만 "+result.returned+"개 생성되었습니다.");
+  startSession(result.items,$("kind").value,"선택한 자료에서 출제");
+ }catch(e){err(e);}finally{setBusy(btn,false);}
+});
+$("retryWrong").addEventListener("click",()=>{
+ const pool=wrongItems.filter(x=>!x.mastered).map(x=>x.item).filter(Boolean);
+ if(!pool.length){notice("복습할 오답이 없습니다.",true);return;}
+ startSession(pool,"question","오답 재시험");
+});
+$("showWrong").addEventListener("click",()=>{$("wrongList").hidden=!$("wrongList").hidden;});
+$("flip").addEventListener("click",()=>{
+ const i=session[position];text("cardAnswer",i.answer+"\n\n"+i.explanation+"\n\n원문: "+i.evidence);
+ $("back").hidden=false;$("flip").hidden=true;
+ $("cardKnown").disabled=false;$("cardUnknown").disabled=false;
+});
+$("cardKnown").addEventListener("click",()=>submitResult("recordStudyCard",{known:true},$("cardKnown"),"저장 중"));
+$("cardUnknown").addEventListener("click",()=>submitResult("recordStudyCard",{known:false},$("cardUnknown"),"오답 저장 중"));
+$("startMic").addEventListener("click",startRecording);
+$("stopMic").addEventListener("click",stopRecording);
+$("grade").addEventListener("click",()=>{
+ const answer=$("userAnswer").value.trim();
+ if(!answer){notice("답안 또는 녹음 내용을 입력하세요.",true);return;}
+ if(recording?.state==="recording"){notice("녹음을 종료하고 텍스트를 확인하세요.",true);return;}
+ submitResult("gradeStudyAnswer",{answer},$("grade"),"채점 중...");
+});
+$("next").addEventListener("click",advance);
+$("closeStudy").addEventListener("click",()=>{
+ if(recording?.state==="recording")stopRecording();
+ if(confirm("현재 학습을 종료할까요? 이미 채점한 기록은 보관됩니다.")){
+  $("study").hidden=true;session=[];
+ }
+});
+</script>
+</body></html>
