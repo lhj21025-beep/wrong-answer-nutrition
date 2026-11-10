@@ -55,10 +55,11 @@ label{cursor:pointer}.upload{display:block;padding:15px;border:1px dashed #8a949
 <main id="app" hidden>
 <section>
  <div class="row spread"><h2>1. 학습자료 보관함</h2><span id="fileCount" class="mini-counter"></span></div>
- <p class="hint">PDF·JPG·PNG·WEBP 파일을 여러 개 저장합니다. 한 파일당 최대 10MB. 서버에서 원문을 읽은 뒤 카드와 문제를 생성합니다.</p>
+ <p class="hint">PDF·JPG·PNG·WEBP 파일을 여러 개 저장합니다. 한 파일당 최대 50MB. 서버에서 원문을 읽은 뒤 카드와 문제를 생성합니다.</p>
  <label class="upload" for="fileInput">+ PDF / 이미지 파일 등록</label>
  <input id="fileInput" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" multiple hidden>
  <div class="row"><button id="selectAll" class="small">완료된 파일 모두 선택</button><button id="clearAll" class="small">선택 해제</button><span id="selectedCount" class="hint"></span></div>
+ <p class="hint"><a href="https://github.com/lhj21025-beep/wrong-answer-nutrition/blob/main/STUDY_SETUP.md" target="_blank" rel="noopener">Firebase 권한 오류 해결 · 설정 안내</a></p>
  <div id="files" class="block"></div>
 </section>
 <section>
@@ -121,7 +122,14 @@ function text(el,v){$(el).textContent=v;}
 function notice(v,bad=false){const n=$("notice");n.style.display="block";n.className=bad?"error":"";n.textContent=v;}
 function clearNotice(){$("notice").style.display="none";}
 function call(name,data){return functions.httpsCallable(name)(data).then(x=>x.data);}
-function err(e){const s=e?.message||String(e);notice(s,true);}
+function err(e){
+ const code=String(e?.code||"").toLowerCase();
+ if(code.includes("permission-denied")||String(e?.message||"").includes("insufficient permissions")){
+   notice("Firebase 데이터 접근 권한이 없습니다. Firestore/Storage 규칙에 AI 학습자료 사용자별 접근권한을 추가해야 합니다. 아래 '설정 안내'를 확인하세요.",true);
+   return;
+ }
+ const s=e?.message||String(e);notice(s,true);
+}
 function elem(tag,cls,content){
  const x=document.createElement(tag);if(cls)x.className=cls;
  if(content!=null)x.textContent=content;return x;
@@ -183,7 +191,7 @@ async function uploadFiles(files){
   if(!["application/pdf","image/jpeg","image/png","image/webp"].includes(mime)){
    notice(file.name+": PDF/JPG/PNG/WEBP만 지원됩니다.",true);continue;
   }
-  if(file.size>10*1024*1024){notice(file.name+": 10MB를 초과했습니다.",true);continue;}
+  if(file.size>50*1024*1024){notice(file.name+": 50MB를 초과했습니다.",true);continue;}
   const ref=sourceCollection().doc(),path="users/"+uid+"/studySources/"+ref.id+"/original";
   try{
    await ref.set({name:file.name,size:file.size,mime,path,status:"uploading",createdAt:firebase.firestore.FieldValue.serverTimestamp()});
