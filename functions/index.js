@@ -50,7 +50,7 @@ function itemClean(x,sources){
   return {sourceId:src.id,sourceName:src.name,question:str(q,500),answer:str(a,1400),
     explanation:str(x.explanation,1500),evidence:e};
 }
-const SOURCE_SIZE_LIMIT=50*1024*1024;
+const SOURCE_SIZE_LIMIT=50*1000*1000;
 // Upload to Gemini Files API rather than embedding base64 in generateContent.
 // Firebase Storage remains the durable copy; the Gemini-side upload is temporary.
 async function stageGeminiFile(buffer,mime,displayName){
